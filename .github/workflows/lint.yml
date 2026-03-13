@@ -20,5 +20,9 @@ jobs:
       - name: Install Ruff
         run: python -m pip install ruff
 
-      - name: Run Ruff
-        run: ruff check .
+      - name: Run Ruff on service code
+        run: ruff check service/src
+
+      - name: Run Ruff on CDK code
+        run: ruff check infra
+        
