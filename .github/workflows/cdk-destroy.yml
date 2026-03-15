@@ -1,17 +1,19 @@
-name: CDK Synth
+name: CDK Destroy
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
-  synth:
+  destroy:
     runs-on: ubuntu-latest
 
     defaults:
       run:
         working-directory: infra
+
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
       - name: Check out repository
@@ -35,5 +37,11 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
-      - name: Run CDK synth
-        run: cdk synth
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::651706753149:role/GitHubActionsCdkDeployRole
+          aws-region: us-east-1
+
+      - name: Run CDK destroy
+        run: cdk destroy --force
