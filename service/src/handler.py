@@ -53,7 +53,7 @@ def handle_get_task(event: dict, tasks_table) -> dict:
 
     return json_response(200, item)
 
-def handle_create_task(event: dict, tasks_table) -> dict:
+def handle_create_task(event: dict, tasks_table, tasks_queue) -> dict:
     raw_body = event.get("body") or "{}"
 
     logger.info("Handling create task request. raw_body=%s", raw_body)
@@ -80,7 +80,7 @@ def handle_create_task(event: dict, tasks_table) -> dict:
 
     item = {
         "taskId": task_id,
-        "status": "accepted",
+        "status": "pending_enqueue",
         "jobType": job_type,
         "input": input_value,
         "createdAt": created_at,
@@ -94,6 +94,25 @@ def handle_create_task(event: dict, tasks_table) -> dict:
 
     logger.info("Task stored. taskId=%s", task_id)
 
+    try:
+        tasks_queue.send_message(MessageBody=json.dumps(item))
+    except ClientError:
+        logger.exception("Failed to send task to SQS")
+        return json_response(500, {"error": "Failed to create task"})
+
+    try:
+        tasks_table.update_item(
+            Key={"taskId": task_id},
+            UpdateExpression="SET #status = :status",
+            ExpressionAttributeNames={"#status": "status"},
+            ExpressionAttributeValues={":status": "queued"},
+        )
+    except ClientError:
+        logger.exception("Failed to update task status in DynamoDB")
+        return json_response(500, {"error": "Failed to create task"})
+
+    logger.info("Task enqueued. taskId=%s", task_id)
+    item["status"] = "queued"
     return json_response(202, item)
 
 def handler(event, context):
@@ -101,12 +120,21 @@ def handler(event, context):
     path = http_info.get("path")
     method = http_info.get("method")
     tasks_table_name = os.getenv("TASKS_TABLE_NAME")
+    tasks_queue_url = os.getenv("TASKS_QUEUE_URL")
+    # validation
     if not tasks_table_name:
         logger.error("TASKS_TABLE_NAME environment variable is not set")
         return json_response(500, {"error": "Internal server error"})
 
+    if not tasks_queue_url:
+        logger.error("TASKS_QUEUE_URL environment variable is not set")
+        return json_response(500, {"error": "Internal server error"})
+
     dynamodb = boto3.resource("dynamodb")
     tasks_table = dynamodb.Table(tasks_table_name)
+
+    sqs = boto3.resource("sqs")
+    tasks_queue = sqs.Queue(tasks_queue_url)
 
     logger.info("Incoming request. method=%s path=%s", method, path)
 
@@ -117,7 +145,7 @@ def handler(event, context):
         return handle_hello(event)
 
     if path == "/tasks" and method == "POST":
-        return handle_create_task(event, tasks_table)
+        return handle_create_task(event, tasks_table, tasks_queue)
 
     if path.startswith("/tasks/") and method == "GET":
         return handle_get_task(event, tasks_table)

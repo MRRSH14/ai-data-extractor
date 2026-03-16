@@ -3,6 +3,7 @@ from aws_cdk import (
     CfnOutput,
     aws_lambda as _lambda,
     aws_dynamodb as dynamodb,
+    aws_sqs as sqs,
 )
 from constructs import Construct
 from aws_cdk.aws_apigatewayv2 import HttpApi, HttpMethod
@@ -21,6 +22,12 @@ class InfraStack(Stack):
                 type=dynamodb.AttributeType.STRING,
             ),
         )
+
+        tasks_queue = sqs.Queue(
+            self,
+            "TasksQueue",
+        )
+
         app_lambda = _lambda.Function(
             self,
             "AppLambda",
@@ -29,10 +36,13 @@ class InfraStack(Stack):
             code=_lambda.Code.from_asset("../service/src"),
             environment={
                 "TASKS_TABLE_NAME": tasks_table.table_name,
+                "TASKS_QUEUE_URL": tasks_queue.queue_url,
             },
         )
 
         tasks_table.grant_read_write_data(app_lambda)
+
+        tasks_queue.grant_send_messages(app_lambda)
 
         app_lambda_integration = HttpLambdaIntegration(
             "AppLambdaIntegration",
