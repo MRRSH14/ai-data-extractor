@@ -30,7 +30,7 @@ def process_record(tasks_table, record: dict) -> None:
     update_task_status(tasks_table, task_id, "running")
 
     # Simulate background work for now.
-    time.sleep(3)
+    time.sleep(20)
 
     update_task_status(tasks_table, task_id, "completed")
 
