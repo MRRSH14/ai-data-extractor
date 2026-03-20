@@ -88,8 +88,8 @@ class InfraStack(Stack):
             self,
             "AppLambda",
             runtime=_lambda.Runtime.PYTHON_3_12,
-            handler="api_handler.handler",
-            code=_lambda.Code.from_asset("../service/src"),
+            handler="service.api_handler.handler",
+            code=_lambda.Code.from_asset("../src"),
             environment={
                 "TASKS_TABLE_NAME": tasks_table.table_name,
                 "TASKS_QUEUE_URL": tasks_queue.queue_url,
@@ -100,8 +100,8 @@ class InfraStack(Stack):
             self,
             "WorkerLambda",
             runtime=_lambda.Runtime.PYTHON_3_12,
-            handler="worker_handler.handler",
-            code=_lambda.Code.from_asset("../service/src"),
+            handler="worker.worker_handler.handler",
+            code=_lambda.Code.from_asset("../src"),
             timeout=Duration.seconds(30),
             environment={
                 "TASKS_TABLE_NAME": tasks_table.table_name,

@@ -26,6 +26,7 @@ def handle_hello(event: dict) -> dict:
 
     return json_response(200, {"message": f"Hello {name}!"})
 
+
 def handle_get_task(event: dict, tasks_table) -> dict:
     path_params = event.get("pathParameters") or {}
     task_id = path_params.get("id")
@@ -46,6 +47,7 @@ def handle_get_task(event: dict, tasks_table) -> dict:
         return json_response(404, {"error": "Task not found"})
 
     return json_response(200, item)
+
 
 def handle_create_task(event: dict, tasks_table, tasks_queue) -> dict:
     raw_body = event.get("body") or "{}"
@@ -104,6 +106,7 @@ def handle_create_task(event: dict, tasks_table, tasks_queue) -> dict:
     item["status"] = "queued"
     item["updated_at"] = datetime.now(timezone.utc).isoformat()
     return json_response(202, item)
+
 
 def handler(event, context):
     http_info = event.get("requestContext", {}).get("http", {})

@@ -50,4 +50,3 @@ def update_task_status(tasks_table, task_id: str, status: str) -> None:
         raise
 
     logger.info("Task updated. task_id=%s, status=%s", task_id, status)
-
