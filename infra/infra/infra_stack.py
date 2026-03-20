@@ -71,18 +71,17 @@ class InfraStack(Stack):
             "DeadLetterQueueMessagesAlarmTopic",
         )
         email = os.getenv("DLQ_ALERT_EMAIL")
-        if not email:
-            raise ValueError("DLQ_ALERT_EMAIL is not set")
-        sns_subscription = sns_subscriptions.EmailSubscription(
-            email_address=email,
-        )
+        if email:
+            sns_subscription = sns_subscriptions.EmailSubscription(
+                email_address=email,
+            )
 
-        # Type-checkers can be overly strict about CDK subscription interface stubs.
-        # Runtime behavior is fine.
-        alarm_topic.add_subscription(sns_subscription)  # type: ignore[arg-type]
+            # Type-checkers can be overly strict about CDK subscription interface stubs.
+            # Runtime behavior is fine.
+            alarm_topic.add_subscription(sns_subscription)  # type: ignore[arg-type]
 
-        # Use the correct CDK alarm action for SNS notifications.
-        cw_alarm.add_alarm_action(cw_actions.SnsAction(alarm_topic))  # type: ignore[arg-type]
+            # Use the correct CDK alarm action for SNS notifications.
+            cw_alarm.add_alarm_action(cw_actions.SnsAction(alarm_topic))  # type: ignore[arg-type]
         
         api_lambda = _lambda.Function(
             self,

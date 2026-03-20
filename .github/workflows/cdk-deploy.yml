@@ -44,4 +44,6 @@ jobs:
           aws-region: us-east-1
 
       - name: Run CDK deploy
+        env:
+          DLQ_ALERT_EMAIL: ${{ secrets.DLQ_ALERT_EMAIL }}
         run: cdk deploy --require-approval never
