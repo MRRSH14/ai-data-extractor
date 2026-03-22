@@ -29,17 +29,30 @@ def get_tasks_table():
     return dynamodb.Table(tasks_table_name)
 
 
-def update_task_status(tasks_table, task_id: str, status: str) -> None:
+def update_task_status(
+    tasks_table,
+    task_id: str,
+    status: str,
+    *,
+    error_message: str | None = None,
+) -> None:
     updated_at = datetime.now(timezone.utc).isoformat()
+    expr_names = {"#status": "status"}
+    expr_values = {
+        ":status": status,
+        ":updated_at": updated_at,
+    }
+    update_parts = ["#status = :status", "updated_at = :updated_at"]
+    if error_message is not None:
+        expr_names["#err"] = "error_message"
+        expr_values[":err"] = error_message[:2000]
+        update_parts.append("#err = :err")
     try:
         tasks_table.update_item(
             Key={"task_id": task_id},
-            UpdateExpression="SET #status = :status, updated_at = :updated_at",
-            ExpressionAttributeNames={"#status": "status"},
-            ExpressionAttributeValues={
-                ":status": status,
-                ":updated_at": updated_at,
-            },
+            UpdateExpression="SET " + ", ".join(update_parts),
+            ExpressionAttributeNames=expr_names,
+            ExpressionAttributeValues=expr_values,
         )
     except ClientError:
         logger.exception(

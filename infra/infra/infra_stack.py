@@ -161,3 +161,33 @@ class InfraStack(Stack):
             "ApiUrl",
             value=http_api.api_endpoint,
         )
+        CfnOutput(
+            self,
+            "TasksQueueUrl",
+            value=tasks_queue.queue_url,
+            description="Main SQS queue URL (worker input).",
+        )
+        CfnOutput(
+            self,
+            "TasksQueueArn",
+            value=tasks_queue.queue_arn,
+            description="Main SQS queue ARN (redrive destination).",
+        )
+        CfnOutput(
+            self,
+            "DeadLetterQueueUrl",
+            value=dead_letter_queue.queue_url,
+            description="DLQ URL — failed messages after max receives.",
+        )
+        CfnOutput(
+            self,
+            "DeadLetterQueueArn",
+            value=dead_letter_queue.queue_arn,
+            description="DLQ ARN — use with StartMessageMoveTask / scripts.",
+        )
+        CfnOutput(
+            self,
+            "DeadLetterQueueAlarmTopicArn",
+            value=alarm_topic.topic_arn,
+            description="SNS topic for DLQ alarm (subscribe email here if not set at deploy).",
+        )

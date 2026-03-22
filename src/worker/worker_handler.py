@@ -47,11 +47,17 @@ def handler(event, context):
 
     processed = 0
     failed = 0
+
     for record in records:
         message_id = record.get("messageId")
-        receive_count = (record.get("attributes") or {}).get(
-            "ApproximateReceiveCount"
+        receive_count_raw = (record.get("attributes") or {}).get(
+            "ApproximateReceiveCount", "1"
         )
+        try:
+            receive_count = int(receive_count_raw)
+        except (TypeError, ValueError):
+            receive_count = 1
+
         try:
             process_record(tasks_table, record)
             processed += 1
@@ -71,7 +77,12 @@ def handler(event, context):
             failed += 1
             try:
                 task_id = parse_task_id_from_record(record)
-                update_task_status(tasks_table, task_id, "failed")
+                update_task_status(
+                    tasks_table,
+                    task_id,
+                    "failed",
+                    error_message=str(exc),
+                )
                 logger.info(
                     "Marked task as failed. task_id=%s message_id=%s receive_count=%s",
                     task_id,
@@ -91,5 +102,48 @@ def handler(event, context):
                     message_id,
                     receive_count,
                 )
+        except Exception as exc:
+            # Transient / unknown failures (timeouts, network, bugs):
+            # keep failing the invocation so SQS can retry and eventually
+            # move the message to DLQ after maxReceiveCount.
+            logger.exception(
+                "Processing error (may retry). message_id=%s receive_count=%s error=%s",
+                message_id,
+                receive_count,
+                exc,
+            )
+            try:
+                task_id = parse_task_id_from_record(record)
+                err_text = str(exc)
+                update_task_status(
+                    tasks_table,
+                    task_id,
+                    "retrying",
+                    error_message=err_text,
+                )
+                logger.info(
+                    "Marked task as retrying. task_id=%s message_id=%s "
+                    "receive_count=%s",
+                    task_id,
+                    message_id,
+                    receive_count,
+                )
+                raise
+            except ValueError:
+                logger.exception(
+                    "Skipping transient status update: could not extract task_id. "
+                    "message_id=%s receive_count=%s",
+                    message_id,
+                    receive_count,
+                )
+                raise
+            except Exception:
+                logger.exception(
+                    "Failed to update task after transient error. "
+                    "message_id=%s receive_count=%s",
+                    message_id,
+                    receive_count,
+                )
+                raise
 
     return {"processed": processed, "failed": failed}
