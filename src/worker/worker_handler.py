@@ -30,7 +30,7 @@ def process_record(tasks_table, record: dict) -> None:
     update_task_status(tasks_table, task_id, "running")
 
     # Simulate background work for now.
-    time.sleep(20)
+    time.sleep(5)
 
     update_task_status(tasks_table, task_id, "completed")
 
@@ -69,7 +69,7 @@ def handler(event, context):
         except ValueError as exc:
             # Known data/validation issues are terminal for this task.
             logger.exception(
-                "Known processing error. message_id=%s receive_count=%s error=%s",
+                "Processing error. message_id=%s receive_count=%s error=%s",
                 message_id,
                 receive_count,
                 exc,

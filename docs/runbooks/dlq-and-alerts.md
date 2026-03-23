@@ -16,8 +16,8 @@ Stack outputs (after deploy): **DeadLetterQueueUrl**, **TasksQueueUrl** (CloudFo
 1. **`DLQ_ALERT_EMAIL` was not set at `cdk deploy` time**  
    The stack only creates an **SNS email subscription** and wires the **CloudWatch alarm → SNS** when this environment variable is set. Manual deploy without it means **no subscriber** and **no alarm action** to SNS.
 
-2. **The alarm is strict**  
-   It fires when **visible DLQ messages &gt; 3** for **5 consecutive 1‑minute evaluation periods** (all 5 datapoints must breach). A **single** poison message often **will not** page you.
+2. **Alarm sensitivity changed recently**  
+   It now fires when the DLQ has **at least 1 visible message** for **1 minute**. This gives faster notification for single-message failures, but can create more alert noise.
 
 ---
 
@@ -88,8 +88,36 @@ Optional: `--profile your-profile --region us-east-1`.
 
 ---
 
+## Operator semantics: `retrying` vs DLQ vs DynamoDB
+
+Use this model to avoid confusion during incidents:
+
+- **`retrying` means:** the last worker attempt failed with a non-terminal error, and SQS may deliver again.
+- **DLQ placement means:** SQS exhausted retry attempts (`maxReceiveCount`) and moved the message to DLQ.
+- **Important:** DynamoDB status can still show `retrying` even after DLQ placement. Queue state is often the final operator truth for “what happens next.”
+
+### Quick triage table
+
+| Symptom | Likely cause | What to check first | Task status you may see |
+|---|---|---|---|
+| Email alarm, 1+ message in DLQ | Worker transient/unknown error repeated | CloudWatch alarm history + DLQ visible count | `retrying` (common), sometimes older `running`/`queued` |
+| Message stays in DLQ after redrive attempt | Root issue not fixed, message fails again | Worker logs around task/message ID | flips `running` → `retrying`, then returns to DLQ |
+| No email but failures suspected | SNS action/subscription missing or unconfirmed | SNS topic subscriptions + alarm actions | Any prior state; status alone is not enough |
+
+### Minimal operator flow
+
+1. Confirm DLQ has messages (`stats` or SQS console).
+2. Peek a few messages (`peek`) and capture `task_id` + error context.
+3. Check worker CloudWatch logs for the same IDs and identify root cause.
+4. Fix code/config/data issue first.
+5. Redrive from DLQ to main queue.
+6. Confirm lifecycle in DynamoDB and logs (`running` → `completed`, or repeat if still failing).
+
+---
+
 ## Operational notes
 
 - **Current behavior:** For transient failures, the worker keeps failing the invocation so SQS can retry and eventually move the message to the DLQ after `maxReceiveCount`.
 - **DLQ processing mode:** There is no automatic DLQ consumer Lambda; messages remain in DLQ for manual inspection and redrive.
+- **Alert behavior:** Alarm is tuned for fast detection (`>= 1` visible DLQ message, 1-minute period). Keep notifications enabled and verify SNS email subscriptions after deploy.
 - **Retention:** DLQ messages are kept **7 days** (see CDK). Redrive or delete before retention expires if you care about them.

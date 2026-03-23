@@ -56,13 +56,13 @@ class InfraStack(Stack):
             metric=dead_letter_queue.metric_approximate_number_of_messages_visible(
                 period=Duration.minutes(1)
             ),
-            threshold=3,
-            evaluation_periods=5,
-            datapoints_to_alarm=5,
+            threshold=1,
+            evaluation_periods=1,
+            datapoints_to_alarm=1,
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
             alarm_description=(
-                "DLQ has more than 3 visible messages for 5 minutes. "
-                "Investigate worker failures and redrive after fix."
+                "DLQ has at least 1 visible message for 1 minute. "
+                "Investigate quickly and redrive manually after fix."
             ),
         )
 

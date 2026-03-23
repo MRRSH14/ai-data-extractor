@@ -35,7 +35,7 @@ flowchart LR
 
 Supporting pieces (not shown in detail above):
 
-- **CloudWatch alarm** on approximate visible messages in the DLQ, optionally wired to **SNS** for email when `DLQ_ALERT_EMAIL` is set at deploy time.
+- **CloudWatch alarm** on approximate visible messages in the DLQ (currently tuned for fast detection: `>= 1` visible message for 1 minute), optionally wired to **SNS** for email when `DLQ_ALERT_EMAIL` is set at deploy time.
 
 ## Request flow
 
@@ -122,7 +122,7 @@ The sprint roadmap used names like `pending`; in code, the pre-queue state is **
 - **No automatic DLQ processing:** Poison or stuck messages require manual or scripted handling.
 - **Worker is a stub:** Processing is a sleep; there is no real AI or external integration yet.
 - **Single table, string PK:** `task_id` only; no GSIs for listing by user or tenant.
-- **Alarm sensitivity:** DLQ alarm thresholds may not page on a single bad message; see the runbook.
+- **Alert noise tradeoff:** DLQ alarm is tuned to page quickly (including single-message incidents), which can be noisier than backlog-only alerting; see the runbook.
 
 These limits are acceptable for a **foundation** milestone; tightening them is tracked in the product roadmap (auth, observability, then AI layer).
 

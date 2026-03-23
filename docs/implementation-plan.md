@@ -36,7 +36,7 @@ These came from **this thread** and related chats; they **extend** the baseline,
 | G | **Concurrency & limits** | Account/region Lambda concurrency, optional reserved concurrency on worker, SQS-driven parallelism, DynamoDB hot partitions / throttling—**document first knobs** before tuning. | **P1** with observability week (Week 4) or right after |
 | H | **Lambda provisioned concurrency** | Reduce cold starts; **costs money**—defer until metrics/SLOs justify (often API more than worker). | **P3** unless latency is contractual |
 | I | **GSIs / list-by-tenant-or-user** | Today: only efficient **get by `task_id`**. Listing “my tasks” or “tenant’s tasks” needs **indexes or new keys**—pairs with **Week 3 tenancy**. | **P1** when you add list APIs |
-| J | **DLQ alarm behavior vs email** | Reconcile “threshold tuned for backlog” with **observed** emails (subscription confirmation vs alarm, message count, console edits). Optional **second alarm** (“any message”) vs noise. | **P1** ops clarity; see checklist below |
+| J | **DLQ alarm behavior vs email** | Current policy is now fast alerting (`>= 1` visible message for 1 minute). Keep verifying notification paths (subscription confirmation vs alarm, message count, console edits) and tune noise if needed. | **P1** ops clarity; see checklist below |
 
 **Meta (not a backlog ticket):** **ADR** = why we decided; **runbook** = how to operate. **Two components (API + worker)** = tradeoff (more to monitor vs sync Lambda), not a bug.
 
@@ -59,13 +59,13 @@ These came from **this thread** and related chats; they **extend** the baseline,
 
 - [x] `docs/architecture.md` (flows, states, DLQ, limitations)
 - [x] README improvements + ADR 0001 / 0002
-- [ ] Optional: pass end-of-week self-review (“new engineer could onboard from docs alone”)
+- [x] Optional: pass end-of-week self-review (“new engineer could onboard from docs alone”)
 
 ### Week 2 — state & DLQ semantics
 
-- [ ] Document `retrying` vs DLQ vs DynamoDB; operator truth
-- [ ] Expand `docs/runbooks/dlq-and-alerts.md` (symptoms, peek, redrive, DDB expectations)
-- [ ] Optional: `last_error_message` / `last_attempt_at` style fields if still useful
+- [x] Document `retrying` vs DLQ vs DynamoDB; operator truth
+- [x] Expand `docs/runbooks/dlq-and-alerts.md` (symptoms, peek, redrive, DDB expectations)
+- [x] Optional: `last_error_message` / `last_attempt_at` style fields if still useful (deferred intentionally; keep existing `error_message` + `updated_at` for now)
 
 ### Week 3 — auth & tenancy
 
@@ -100,7 +100,7 @@ These came from **this thread** and related chats; they **extend** the baseline,
 
 ### J — DLQ alarm vs single-message email
 
-**Context:** Alarm uses `threshold=3`, five 1-minute evaluation periods, etc. One visible message *should not* match “sustained backlog” tuning; testing still produced an email path via SNS.
+**Context:** Alarm policy is now fast detection (`threshold=1`, one 1-minute period). We still want to verify when emails are subscription-confirmation messages vs real alarm transitions.
 
 **When you pick this up:**
 
