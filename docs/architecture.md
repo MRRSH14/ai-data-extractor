@@ -36,6 +36,7 @@ flowchart LR
 Supporting pieces (not shown in detail above):
 
 - **CloudWatch alarm** on approximate visible messages in the DLQ (currently tuned for fast detection: `>= 1` visible message for 1 minute), optionally wired to **SNS** for email when `DLQ_ALERT_EMAIL` is set at deploy time.
+- **Cognito User Pool + JWT authorizer** on API Gateway for `POST /tasks` and `GET /tasks/{id}`. `/health` and `/hello` are currently public.
 
 ## Request flow
 
@@ -55,7 +56,7 @@ Supporting pieces (not shown in detail above):
 4. **Task read (`GET /tasks/{id}`)**  
    Reads the item by `task_id` from DynamoDB and returns it, or **404** if missing.
 
-There is **no authentication or tenancy** in the current code; any caller who can reach the API can create or read tasks by ID if they guess or obtain the ID.
+Task routes now require JWT authentication at API Gateway. Tenant ownership checks are the next step and are not enforced yet.
 
 ### Async worker path
 
@@ -117,8 +118,7 @@ The sprint roadmap used names like `pending`; in code, the pre-queue state is **
 
 ## Current intentional limitations
 
-- **No auth:** All routes that exist are open to anyone who can call the API URL.
-- **No tenancy:** Task rows have no `tenant_id`; isolation is not enforced.
+- **No tenant ownership enforcement yet:** Task rows currently have no `tenant_id`, and cross-tenant checks are not implemented in handlers yet.
 - **No automatic DLQ processing:** Poison or stuck messages require manual or scripted handling.
 - **Worker is a stub:** Processing is a sleep; there is no real AI or external integration yet.
 - **Single table, string PK:** `task_id` only; no GSIs for listing by user or tenant.
@@ -140,4 +140,5 @@ This service is **single-region** and relies on **managed** API Gateway, Lambda,
 - [Implementation plan (living)](implementation-plan.md) — sprint checklist, priorities, extended topics from discussion
 - [ADR 0001: Async task pattern](adrs/0001-async-task-pattern.md)
 - [ADR 0002: DLQ manual operation](adrs/0002-dlq-manual-operation.md)
+- [ADR 0003: Auth and tenancy](adrs/0003-auth-and-tenancy.md)
 - [DLQ and alerts runbook](runbooks/dlq-and-alerts.md)

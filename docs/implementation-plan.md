@@ -69,8 +69,8 @@ These came from **this thread** and related chats; they **extend** the baseline,
 
 ### Week 3 — auth & tenancy
 
-- [ ] `docs/adrs/0003-auth-and-tenancy.md`
-- [ ] Cognito JWT authorizer in CDK; protect task routes; `/health` public
+- [x] `docs/adrs/0003-auth-and-tenancy.md`
+- [x] Cognito JWT authorizer in CDK; protect task routes; `/health` public
 - [ ] Tenant fields + ownership checks on `POST` / `GET`
 
 ### Week 4 — observability

@@ -7,10 +7,12 @@ from aws_cdk import (
     aws_cloudwatch as cloudwatch,
     aws_sns_subscriptions as sns_subscriptions,
     aws_cloudwatch_actions as cw_actions,
+    aws_cognito as cognito,
 )
 from constructs import Construct
 from aws_cdk.aws_apigatewayv2 import HttpApi, HttpMethod
 from aws_cdk.aws_apigatewayv2_integrations import HttpLambdaIntegration
+from aws_cdk.aws_apigatewayv2_authorizers import HttpJwtAuthorizer
 from aws_cdk import RemovalPolicy
 from aws_cdk import Duration
 from aws_cdk.aws_lambda_event_sources import SqsEventSource
@@ -47,6 +49,21 @@ class InfraStack(Stack):
             dead_letter_queue=sqs.DeadLetterQueue(
                 max_receive_count=5,
                 queue=dead_letter_queue,
+            ),
+        )
+
+        user_pool = cognito.UserPool(
+            self,
+            "TasksUserPool",
+            self_sign_up_enabled=True,
+            sign_in_aliases=cognito.SignInAliases(email=True),
+        )
+
+        user_pool_client = user_pool.add_client(
+            "TasksUserPoolClient",
+            auth_flows=cognito.AuthFlow(
+                user_password=True,
+                user_srp=True,
             ),
         )
         
@@ -132,6 +149,12 @@ class InfraStack(Stack):
             "AwsAiPlatformServiceApi",
         )
 
+        jwt_authorizer = HttpJwtAuthorizer(
+            "TasksJwtAuthorizer",
+            jwt_issuer=f"https://cognito-idp.{self.region}.amazonaws.com/{user_pool.user_pool_id}",
+            jwt_audience=[user_pool_client.user_pool_client_id],
+        )
+
         http_api.add_routes(
             path="/health",
             methods=[HttpMethod.GET],
@@ -148,12 +171,14 @@ class InfraStack(Stack):
             path="/tasks",
             methods=[HttpMethod.POST],
             integration=api_lambda_integration,
+            authorizer=jwt_authorizer,
         )
 
         http_api.add_routes(
             path="/tasks/{id}",
             methods=[HttpMethod.GET],
             integration=api_lambda_integration,
+            authorizer=jwt_authorizer,
         )
 
         CfnOutput(
@@ -190,4 +215,16 @@ class InfraStack(Stack):
             "DeadLetterQueueAlarmTopicArn",
             value=alarm_topic.topic_arn,
             description="SNS topic for DLQ alarm (subscribe email here if not set at deploy).",
+        )
+        CfnOutput(
+            self,
+            "TasksUserPoolId",
+            value=user_pool.user_pool_id,
+            description="Cognito User Pool ID for API authentication.",
+        )
+        CfnOutput(
+            self,
+            "TasksUserPoolClientId",
+            value=user_pool_client.user_pool_client_id,
+            description="Cognito User Pool App Client ID (JWT audience).",
         )

@@ -22,12 +22,12 @@ Rationale is recorded in [ADR 0001](docs/adrs/0001-async-task-pattern.md). DLQ h
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET` | `/health` | Liveness-style check (`{"ok": true}`). |
-| `GET` | `/hello` | Sample query param `name` (demo / smoke). |
-| `POST` | `/tasks` | Create a task. JSON body: `job_type` (string), `input` (any). Returns **202** with task including `task_id` and `status`. |
-| `GET` | `/tasks/{id}` | Return the task item from DynamoDB or **404**. |
+| `GET` | `/health` | Liveness-style check (`{"ok": true}`). **Public** |
+| `GET` | `/hello` | Sample query param `name` (demo / smoke). **Public** |
+| `POST` | `/tasks` | Create a task. JSON body: `job_type` (string), `input` (any). Returns **202** with task including `task_id` and `status`. **JWT required** |
+| `GET` | `/tasks/{id}` | Return the task item from DynamoDB or **404**. **JWT required** |
 
-**Security note:** There is **no authentication** yet; anyone who can reach the API can create tasks and read tasks by ID.
+**Security note:** API Gateway now uses a Cognito User Pool JWT authorizer for task routes. `/health` and `/hello` remain public.
 
 ## Deploy flow
 
@@ -43,7 +43,7 @@ export DLQ_ALERT_EMAIL="ops@example.com"            # optional: SNS email for DL
 cdk deploy
 ```
 
-Stack outputs include **ApiUrl**, **TasksQueueUrl**, **DeadLetterQueueUrl**, and related ARNs.
+Stack outputs include **ApiUrl**, **TasksQueueUrl**, **DeadLetterQueueUrl**, **TasksUserPoolId**, **TasksUserPoolClientId**, and related ARNs.
 
 **CI:** [`.github/workflows/cdk-deploy.yml`](.github/workflows/cdk-deploy.yml) runs on **workflow_dispatch**, assumes an AWS role via OIDC, sets `DLQ_ALERT_EMAIL` from **GitHub Actions secrets**, and runs `cdk deploy` from the `infra/` directory.
 
@@ -64,8 +64,8 @@ Task statuses and the split between **DynamoDB status** and **SQS/DLQ** behavior
 
 | Phase | Focus |
 |-------|--------|
-| **Current** | Async skeleton: API + SQS + worker + DynamoDB + DLQ + basic alarm/email path; documentation and ADRs. |
-| **Next** | Tighten **state semantics** and operator docs (retries vs DLQ); then **auth (e.g. Cognito JWT)**, **tenant fields**, and **structured observability** (logs, correlation IDs, metrics). |
+| **Current** | Async skeleton + auth boundary: API + SQS + worker + DynamoDB + DLQ + Cognito JWT protection on task routes; docs and ADRs. |
+| **Next** | Add **tenant fields** and ownership checks, then **structured observability** (logs, correlation IDs, metrics). |
 | **Later** | **AI layer**: provider abstraction, task payload for model work, worker execution, persistence, cost/guardrails—**after** the platform boundary is credible. |
 
 ## Documentation index
@@ -74,4 +74,5 @@ Task statuses and the split between **DynamoDB status** and **SQS/DLQ** behavior
 - [Implementation plan (living roadmap & checklist)](docs/implementation-plan.md)
 - [ADR 0001 — Async task pattern](docs/adrs/0001-async-task-pattern.md)
 - [ADR 0002 — DLQ manual operation](docs/adrs/0002-dlq-manual-operation.md)
+- [ADR 0003 — Auth and tenancy](docs/adrs/0003-auth-and-tenancy.md)
 - [DLQ runbook](docs/runbooks/dlq-and-alerts.md)
