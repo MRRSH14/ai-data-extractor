@@ -57,6 +57,11 @@ class InfraStack(Stack):
             "TasksUserPool",
             self_sign_up_enabled=True,
             sign_in_aliases=cognito.SignInAliases(email=True),
+            custom_attributes={
+                "tenant_id": cognito.StringAttribute(
+                    mutable=True,
+                ),
+            },
         )
 
         user_pool_client = user_pool.add_client(

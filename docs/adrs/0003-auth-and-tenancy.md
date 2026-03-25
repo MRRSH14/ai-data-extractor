@@ -54,6 +54,11 @@ On task read (`GET /tasks/{id}`):
 - compare caller tenant claim to task `tenant_id`;
 - deny cross-tenant access.
 
+For this phase we use **strict mode**:
+
+- if the token is missing `custom:tenant_id`, the API returns `403` (missing tenant context).
+- we do not apply any dev-only default tenant_id fallback yet.
+
 ## Consequences
 
 ### Positive
