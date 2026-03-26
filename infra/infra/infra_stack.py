@@ -63,6 +63,7 @@ class InfraStack(Stack):
                 ),
             },
         )
+        user_pool.apply_removal_policy(RemovalPolicy.DESTROY)
 
         user_pool_client = user_pool.add_client(
             "TasksUserPoolClient",

@@ -57,8 +57,32 @@ Stack outputs include **ApiUrl**, **TasksQueueUrl**, **DeadLetterQueueUrl**, **T
 
 - **DLQ, redrive, alarms:** [docs/runbooks/dlq-and-alerts.md](docs/runbooks/dlq-and-alerts.md)
 - **Helper script:** `scripts/dlq_redrive.py` (requires `boto3`)
+- **Dev auth/test scripts:** `scripts/dev_setup.sh`, `scripts/dev_test_endpoints.sh`
 
 Task statuses and the split between **DynamoDB status** and **SQS/DLQ** behavior are documented in **architecture** and the runbook; after max retries, a message can sit in the DLQ while DynamoDB may still show `retrying` until you redrive or update the record.
+
+## Dev auth/testing scripts
+
+For local development against a deployed stack, you can automate Cognito user setup/login and API smoke tests:
+
+```bash
+./scripts/dev_setup.sh
+```
+
+What it does:
+
+- resolves `ApiUrl`, `TasksUserPoolId`, and `TasksUserPoolClientId` from `InfraStack` outputs;
+- ensures two users exist with tenant attributes:
+  - `test_user@example.com` -> `test_tenant`
+  - `demo_user@example.com` -> `demo_tenant`
+- logs in both users and obtains JWTs;
+- runs `scripts/dev_test_endpoints.sh` endpoint checks (public routes, protected routes, and cross-tenant denial).
+
+You can run endpoint tests directly if you already have tokens:
+
+```bash
+API_URL="..." TEST_ID_TOKEN="..." DEMO_ID_TOKEN="..." ./scripts/dev_test_endpoints.sh
+```
 
 ## Roadmap summary
 
