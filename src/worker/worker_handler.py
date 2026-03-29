@@ -4,28 +4,79 @@ import time
 from shared import logger, get_tasks_table, update_task_status
 
 
-def parse_task_id_from_record(record: dict) -> str:
+def _worker_extra(
+    task_id: str,
+    *,
+    correlation_id: str | None = None,
+    message_id: str | None = None,
+    receive_count: int | None = None,
+    event: str | None = None,
+) -> dict:
+    extra: dict = {"component": "worker", "task_id": task_id}
+    if correlation_id:
+        extra["correlation_id"] = correlation_id
+    if message_id is not None:
+        extra["message_id"] = message_id
+    if receive_count is not None:
+        extra["receive_count"] = receive_count
+    if event is not None:
+        extra["event"] = event
+    return extra
+
+
+def parse_task_payload(record: dict) -> dict:
     body = record.get("body")
     if not body:
-        logger.error("SQS record body is missing")
+        logger.error(
+            "SQS record body is missing",
+            extra={"component": "worker", "event": "parse_error"},
+        )
         raise ValueError("SQS record body is missing")
 
     try:
         message = json.loads(body)
     except json.JSONDecodeError:
-        logger.error("Invalid JSON in SQS message body: %s", body)
+        logger.error(
+            "Invalid JSON in SQS message body",
+            extra={"component": "worker", "event": "parse_error", "body_preview": body[:500]},
+        )
         raise ValueError("Invalid JSON in SQS message body")
 
     task_id = message.get("task_id")
     if not task_id:
-        logger.error("task_id is missing in SQS message: %s", message)
+        logger.error(
+            "task_id is missing in SQS message",
+            extra={"component": "worker", "event": "parse_error"},
+        )
         raise ValueError("task_id is missing in SQS message")
 
-    return task_id
+    correlation_id = message.get("correlation_id")
+    if correlation_id is not None and not isinstance(correlation_id, str):
+        correlation_id = str(correlation_id)
+
+    return {
+        "task_id": task_id,
+        "correlation_id": correlation_id,
+    }
 
 
-def process_record(tasks_table, record: dict) -> None:
-    task_id = parse_task_id_from_record(record)
+def parse_task_id_from_record(record: dict) -> str:
+    """Backward-compatible: task id only (used in error paths)."""
+    return parse_task_payload(record)["task_id"]
+
+
+def process_record(tasks_table, payload: dict) -> None:
+    task_id = payload["task_id"]
+    correlation_id = payload.get("correlation_id")
+
+    logger.info(
+        "Task processing started",
+        extra=_worker_extra(
+            task_id,
+            correlation_id=correlation_id,
+            event="task_running",
+        ),
+    )
 
     update_task_status(tasks_table, task_id, "running")
 
@@ -34,16 +85,35 @@ def process_record(tasks_table, record: dict) -> None:
 
     update_task_status(tasks_table, task_id, "completed")
 
+    logger.info(
+        "Task processing completed",
+        extra=_worker_extra(
+            task_id,
+            correlation_id=correlation_id,
+            event="task_completed",
+        ),
+    )
+
 
 def handler(event, context):
     records = event.get("Records", [])
     if not records:
-        logger.warning("No SQS records received")
+        logger.warning(
+            "No SQS records received",
+            extra={"component": "worker", "event": "empty_batch"},
+        )
         return {"processed": 0}
 
     tasks_table = get_tasks_table()
 
-    logger.info("Received %d SQS record(s)", len(records))
+    logger.info(
+        "Received SQS batch",
+        extra={
+            "component": "worker",
+            "event": "batch_start",
+            "record_count": len(records),
+        },
+    )
 
     processed = 0
     failed = 0
@@ -59,61 +129,42 @@ def handler(event, context):
             receive_count = 1
 
         try:
-            process_record(tasks_table, record)
+            payload = parse_task_payload(record)
+        except ValueError:
+            failed += 1
+            continue
+
+        task_id = payload["task_id"]
+        correlation_id = payload.get("correlation_id")
+
+        try:
+            process_record(tasks_table, payload)
             processed += 1
             logger.info(
-                "Record processed successfully. message_id=%s receive_count=%s",
-                message_id,
-                receive_count,
-            )
-        except ValueError as exc:
-            # Known data/validation issues are terminal for this task.
-            logger.exception(
-                "Processing error. message_id=%s receive_count=%s error=%s",
-                message_id,
-                receive_count,
-                exc,
-            )
-            failed += 1
-            try:
-                task_id = parse_task_id_from_record(record)
-                update_task_status(
-                    tasks_table,
+                "Record processed successfully",
+                extra=_worker_extra(
                     task_id,
-                    "failed",
-                    error_message=str(exc),
-                )
-                logger.info(
-                    "Marked task as failed. task_id=%s message_id=%s receive_count=%s",
-                    task_id,
-                    message_id,
-                    receive_count,
-                )
-            except ValueError:
-                logger.exception(
-                    "Skipping failed status update: could not extract task_id. "
-                    "message_id=%s receive_count=%s",
-                    message_id,
-                    receive_count,
-                )
-            except Exception:
-                logger.exception(
-                    "Failed to mark task as failed. message_id=%s receive_count=%s",
-                    message_id,
-                    receive_count,
-                )
+                    correlation_id=correlation_id,
+                    message_id=message_id,
+                    receive_count=receive_count,
+                    event="record_ok",
+                ),
+            )
         except Exception as exc:
             # Transient / unknown failures (timeouts, network, bugs):
             # keep failing the invocation so SQS can retry and eventually
             # move the message to DLQ after maxReceiveCount.
             logger.exception(
-                "Processing error (may retry). message_id=%s receive_count=%s error=%s",
-                message_id,
-                receive_count,
-                exc,
+                "Processing error (may retry)",
+                extra=_worker_extra(
+                    task_id,
+                    correlation_id=correlation_id,
+                    message_id=message_id,
+                    receive_count=receive_count,
+                    event="record_error_retryable",
+                ),
             )
             try:
-                task_id = parse_task_id_from_record(record)
                 err_text = str(exc)
                 update_task_status(
                     tasks_table,
@@ -122,27 +173,26 @@ def handler(event, context):
                     error_message=err_text,
                 )
                 logger.info(
-                    "Marked task as retrying. task_id=%s message_id=%s "
-                    "receive_count=%s",
-                    task_id,
-                    message_id,
-                    receive_count,
-                )
-                raise
-            except ValueError:
-                logger.exception(
-                    "Skipping transient status update: could not extract task_id. "
-                    "message_id=%s receive_count=%s",
-                    message_id,
-                    receive_count,
+                    "Marked task as retrying",
+                    extra=_worker_extra(
+                        task_id,
+                        correlation_id=correlation_id,
+                        message_id=message_id,
+                        receive_count=receive_count,
+                        event="task_marked_retrying",
+                    ),
                 )
                 raise
             except Exception:
                 logger.exception(
-                    "Failed to update task after transient error. "
-                    "message_id=%s receive_count=%s",
-                    message_id,
-                    receive_count,
+                    "Failed to update task after transient error",
+                    extra=_worker_extra(
+                        task_id,
+                        correlation_id=correlation_id,
+                        message_id=message_id,
+                        receive_count=receive_count,
+                        event="status_update_error",
+                    ),
                 )
                 raise
 

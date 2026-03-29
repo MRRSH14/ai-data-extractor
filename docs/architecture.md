@@ -36,6 +36,7 @@ flowchart LR
 Supporting pieces (not shown in detail above):
 
 - **CloudWatch alarm** on approximate visible messages in the DLQ (currently tuned for fast detection: `>= 1` visible message for 1 minute), optionally wired to **SNS** for email when `DLQ_ALERT_EMAIL` is set at deploy time.
+- **Structured JSON logs** and a **`correlation_id`** (API Gateway request id) on task records and SQS payloads so API and worker log streams can be joined in Logs Insights—see [observability](observability.md).
 - **Cognito User Pool + JWT authorizer** on API Gateway for `POST /tasks` and `GET /tasks/{id}`. `/health` and `/hello` are currently public.
 
 ## Request flow

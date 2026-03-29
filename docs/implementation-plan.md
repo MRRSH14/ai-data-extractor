@@ -77,9 +77,9 @@ These came from **this thread** and related chats; they **extend** the baseline,
 
 ### Week 4 — observability
 
-- [ ] Structured logging + correlation ID through API → SQS → worker
-- [ ] Metrics/alarms review + `docs/observability.md`
-- [ ] Runbook: trace a failed task end-to-end
+- [x] Structured logging + correlation ID through API → SQS → worker
+- [x] Metrics/alarms review + `docs/observability.md`
+- [x] Runbook: trace a failed task end-to-end
 
 ---
 
@@ -115,7 +115,7 @@ These came from **this thread** and related chats; they **extend** the baseline,
 
 ## Related docs
 
-- [Architecture](architecture.md) — [README](../README.md) — [DLQ runbook](runbooks/dlq-and-alerts.md) — [ADR 0001](adrs/0001-async-task-pattern.md) — [ADR 0002](adrs/0002-dlq-manual-operation.md) — [ADR 0003](adrs/0003-auth-and-tenancy.md)
+- [Architecture](architecture.md) — [README](../README.md) — [Observability](observability.md) — [DLQ runbook](runbooks/dlq-and-alerts.md) — [ADR 0001](adrs/0001-async-task-pattern.md) — [ADR 0002](adrs/0002-dlq-manual-operation.md) — [ADR 0003](adrs/0003-auth-and-tenancy.md)
 
 ---
 

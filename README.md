@@ -55,6 +55,7 @@ Stack outputs include **ApiUrl**, **TasksQueueUrl**, **DeadLetterQueueUrl**, **T
 
 ## Operational notes
 
+- **Observability (logs, correlation IDs, alarms):** [docs/observability.md](docs/observability.md)
 - **DLQ, redrive, alarms:** [docs/runbooks/dlq-and-alerts.md](docs/runbooks/dlq-and-alerts.md)
 - **Helper script:** `scripts/dlq_redrive.py` (requires `boto3`)
 - **Dev auth/test scripts:** `scripts/dev_setup.sh`, `scripts/dev_test_endpoints.sh`
@@ -93,12 +94,13 @@ API_URL="..." TEST_ID_TOKEN="..." DEMO_ID_TOKEN="..." ./scripts/dev_test_endpoin
 | Phase | Focus |
 |-------|--------|
 | **Current** | Async skeleton + auth boundary: API + SQS + worker + DynamoDB + DLQ + Cognito JWT protection on task routes; docs and ADRs. |
-| **Next** | Strengthen tenant onboarding/migration details, then add **structured observability** (logs, correlation IDs, metrics). |
+| **Next** | Strengthen tenant onboarding/migration details; extend **metrics/dashboards** as usage grows (structured logs and correlation IDs are in place—see [observability](docs/observability.md)). |
 | **Later** | **AI layer**: provider abstraction, task payload for model work, worker execution, persistence, cost/guardrails—**after** the platform boundary is credible. |
 
 ## Documentation index
 
 - [Architecture](docs/architecture.md)
+- [Observability](docs/observability.md)
 - [Implementation plan (living roadmap & checklist)](docs/implementation-plan.md)
 - [ADR 0001 — Async task pattern](docs/adrs/0001-async-task-pattern.md)
 - [ADR 0002 — DLQ manual operation](docs/adrs/0002-dlq-manual-operation.md)

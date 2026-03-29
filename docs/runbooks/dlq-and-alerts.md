@@ -108,7 +108,7 @@ Use this model to avoid confusion during incidents:
 
 1. Confirm DLQ has messages (`stats` or SQS console).
 2. Peek a few messages (`peek`) and capture `task_id` + error context.
-3. Check worker CloudWatch logs for the same IDs and identify root cause.
+3. Check worker CloudWatch logs for the same IDs and identify root cause. When present, filter by **`correlation_id`** (stored on the task and in worker logs) to align API and worker lines—see [Observability — trace a failed task](../observability.md#trace-a-failed-task-end-to-end).
 4. Fix code/config/data issue first.
 5. Redrive from DLQ to main queue.
 6. Confirm lifecycle in DynamoDB and logs (`running` → `completed`, or repeat if still failing).

@@ -1,11 +1,63 @@
 import json
 import logging
 import os
+import uuid
 from datetime import datetime, timezone
 
 import boto3
 from botocore.exceptions import ClientError
 
+
+# Attributes LogRecord always has; extras from logger.info(..., extra={...}) merge into the record.
+_LOGRECORD_STANDARD_KEYS = frozenset(
+    vars(
+        logging.LogRecord(
+            name="",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="",
+            args=(),
+            exc_info=None,
+        )
+    ).keys()
+) | frozenset({"message", "exc_info", "exc_text", "stack_info"})
+
+
+class JsonFormatter(logging.Formatter):
+    """One JSON object per line for CloudWatch Logs Insights."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload: dict = {
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
+            + "Z",
+            "level": record.levelname,
+            "message": record.getMessage(),
+            "logger": record.name,
+        }
+        for key, value in record.__dict__.items():
+            if key in _LOGRECORD_STANDARD_KEYS or key.startswith("_"):
+                continue
+            payload[key] = value
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info).strip()
+        return json.dumps(payload, default=str)
+
+
+def _configure_structured_logging() -> None:
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    fmt = JsonFormatter()
+    if root.handlers:
+        for h in root.handlers:
+            h.setFormatter(fmt)
+    else:
+        handler = logging.StreamHandler()
+        handler.setFormatter(fmt)
+        root.addHandler(handler)
+
+
+_configure_structured_logging()
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -19,6 +71,15 @@ def json_response(status_code: int, payload: dict) -> dict:
         "headers": {"Content-Type": "application/json"},
         "body": json.dumps(payload),
     }
+
+
+def get_correlation_id(event: dict) -> str:
+    """Prefer API Gateway request id; otherwise a new UUID (still logged consistently)."""
+    rc = event.get("requestContext") or {}
+    req_id = rc.get("requestId")
+    if isinstance(req_id, str) and req_id.strip():
+        return req_id.strip()
+    return str(uuid.uuid4())
 
 
 def get_tasks_table():
@@ -62,4 +123,12 @@ def update_task_status(
         )
         raise
 
-    logger.info("Task updated. task_id=%s, status=%s", task_id, status)
+    logger.info(
+        "Task updated",
+        extra={
+            "component": "shared",
+            "event": "task_status_update",
+            "task_id": task_id,
+            "status": status,
+        },
+    )
