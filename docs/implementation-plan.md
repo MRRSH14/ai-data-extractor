@@ -38,7 +38,7 @@ These came from **this thread** and related chats; they **extend** the baseline,
 | I | **GSIs / list-by-tenant-or-user** | Today: only efficient **get by `task_id`**. Listing “my tasks” or “tenant’s tasks” needs **indexes or new keys**—pairs with **Week 3 tenancy**. | **P1** when you add list APIs |
 | J | **DLQ alarm behavior vs email** | Current policy is now fast alerting (`>= 1` visible message for 1 minute). Keep verifying notification paths (subscription confirmation vs alarm, message count, console edits) and tune noise if needed. | **P1** ops clarity; see checklist below |
 
-| K | **Tenant provisioning (A: manual, B: automated)** | Decide how new Cognito users get `custom:tenant_id`: start with manual admin/script (A) and enforce strict mode now (missing => `403`, no dev-only default fallback). Later, switch to automated tenant recognition (B) via Cognito triggers or signup flow. | **P1** for practical testing + future automation |
+| K | **Tenant provisioning (A: manual, B: automated)** | Decide how new Cognito users get `custom:tenant_id`: start with manual admin/script (A) and enforce strict mode now (missing => `403`, no dev-only default fallback). Later, switch to automated tenant recognition (B) via Cognito triggers or signup flow. **Implement B when onboarding volume exceeds a practical threshold (for example > X users/week) or when external self-signup is enabled; start B with invite-code mapping for deterministic tenant assignment.** | **P1** for practical testing + future automation |
 
 **Meta (not a backlog ticket):** **ADR** = why we decided; **runbook** = how to operate. **Two components (API + worker)** = tradeoff (more to monitor vs sync Lambda), not a bug.
 
@@ -95,6 +95,7 @@ These came from **this thread** and related chats; they **extend** the baseline,
 - [ ] **(H)** Evaluate provisioned concurrency with real p95/p99
 - [ ] **(I)** GSI (or pattern) for list-by-tenant after Week 3
 - [ ] **(J)** DLQ alarm verification + runbook tweak (see [Deferred follow-ups](#deferred-follow-ups))
+- [ ] **(K)** Tenant provisioning B (automation) once onboarding exceeds threshold or external self-signup is enabled; start with invite-code mapping
 
 ---
 

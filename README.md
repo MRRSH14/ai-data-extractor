@@ -58,7 +58,7 @@ Stack outputs include **ApiUrl**, **TasksQueueUrl**, **DeadLetterQueueUrl**, **T
 - **Observability (logs, correlation IDs, alarms):** [docs/observability.md](docs/observability.md)
 - **DLQ, redrive, alarms:** [docs/runbooks/dlq-and-alerts.md](docs/runbooks/dlq-and-alerts.md)
 - **Helper script:** `scripts/dlq_redrive.py` (requires `boto3`)
-- **Dev auth/test scripts:** `scripts/dev_setup.sh`, `scripts/dev_test_endpoints.sh`
+- **Dev auth/test scripts:** `scripts/dev_setup.sh`, `scripts/dev_test_endpoints.sh`, `scripts/dev_onboard_user.sh`
 
 Task statuses and the split between **DynamoDB status** and **SQS/DLQ** behavior are documented in **architecture** and the runbook; after max retries, a message can sit in the DLQ while DynamoDB may still show `retrying` until you redrive or update the record.
 
@@ -68,6 +68,12 @@ For local development against a deployed stack, you can automate Cognito user se
 
 ```bash
 ./scripts/dev_setup.sh
+```
+
+To onboard a single user manually (Option A: admin + script), use:
+
+```bash
+./scripts/dev_onboard_user.sh
 ```
 
 What it does:
@@ -88,6 +94,14 @@ You can run endpoint tests directly if you already have tokens:
 ```bash
 API_URL="..." TEST_ID_TOKEN="..." DEMO_ID_TOKEN="..." ./scripts/dev_test_endpoints.sh
 ```
+
+### Tenant onboarding acceptance check
+
+Use this quick check after onboarding a user to confirm tenant isolation still works:
+
+1. `POST /tasks` with the onboarded user token -> expect `202`.
+2. `GET /tasks/{id}` with the same user token -> expect `200`.
+3. `GET /tasks/{id}` with a token from a different tenant -> expect `403`.
 
 ## Roadmap summary
 
