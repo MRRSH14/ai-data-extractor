@@ -2,13 +2,17 @@ import json
 from datetime import datetime, timezone
 import uuid
 import os
+import time
 import boto3
 from botocore.exceptions import ClientError
 
 from shared import (
     logger,
+    IDEMPOTENCY_TTL_SECONDS,
+    build_idempotency_key,
     json_response,
     get_correlation_id,
+    get_idempotency_table,
     get_tasks_table,
     update_task_status,
 )
@@ -139,7 +143,7 @@ def handle_get_task(event: dict, tasks_table, *, correlation_id: str) -> dict:
     return json_response(200, item)
 
 
-def handle_create_task(event: dict, tasks_table, tasks_queue) -> dict:
+def handle_create_task(event: dict, tasks_table, idempotency_table, tasks_queue) -> dict:
     raw_body = event.get("body") or "{}"
     correlation_id = get_correlation_id(event)
 
@@ -212,6 +216,23 @@ def handle_create_task(event: dict, tasks_table, tasks_queue) -> dict:
         )
         return json_response(403, {"error": "Missing user identity claim"})
 
+    idempotency_key = build_idempotency_key(
+        tenant_id=tenant_id,
+        created_by=created_by,
+        job_type=job_type,
+        input_value=input_value,
+    )
+    now_epoch = int(time.time())
+    expires_at = now_epoch + IDEMPOTENCY_TTL_SECONDS
+
+    idempotency_item = {
+        "idempotency_key": idempotency_key,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": expires_at,
+        "tenant_id": tenant_id,
+        "created_by": created_by,
+    }
+
     task_id = f"task-{uuid.uuid4().hex[:8]}"
     created_at = datetime.now(timezone.utc).isoformat()
 
@@ -225,7 +246,59 @@ def handle_create_task(event: dict, tasks_table, tasks_queue) -> dict:
         "created_at": created_at,
         "updated_at": created_at,
         "correlation_id": correlation_id,
+        "idempotency_key": idempotency_key,
     }
+
+    try:
+        idempotency_table.put_item(
+            Item={**idempotency_item, "task_id": task_id},
+            ConditionExpression="attribute_not_exists(idempotency_key)",
+        )
+    except ClientError as exc:
+        code = exc.response.get("Error", {}).get("Code")
+        if code == "ConditionalCheckFailedException":
+            logger.info(
+                "Duplicate create request detected via idempotency",
+                extra={
+                    "component": "api",
+                    "correlation_id": correlation_id,
+                    "event": "idempotency_duplicate",
+                    "idempotency_key": idempotency_key,
+                    "tenant_id": tenant_id,
+                },
+            )
+            try:
+                idem_resp = idempotency_table.get_item(
+                    Key={"idempotency_key": idempotency_key}
+                )
+                idem_item = idem_resp.get("Item") or {}
+                existing_task_id = idem_item.get("task_id")
+                if isinstance(existing_task_id, str) and existing_task_id:
+                    existing_resp = tasks_table.get_item(Key={"task_id": existing_task_id})
+                    existing_item = existing_resp.get("Item")
+                    if existing_item:
+                        return json_response(200, existing_item)
+            except ClientError:
+                logger.exception(
+                    "Failed to resolve existing idempotent task",
+                    extra={
+                        "component": "api",
+                        "correlation_id": correlation_id,
+                        "event": "idempotency_lookup_error",
+                        "idempotency_key": idempotency_key,
+                    },
+                )
+            return json_response(409, {"error": "Could not resolve idempotent task"})
+        logger.exception(
+            "Failed to write idempotency record to DynamoDB",
+            extra={
+                "component": "api",
+                "correlation_id": correlation_id,
+                "event": "idempotency_write_error",
+                "idempotency_key": idempotency_key,
+            },
+        )
+        return json_response(500, {"error": "Failed to create task"})
 
     try:
         tasks_table.put_item(Item=item)
@@ -239,6 +312,18 @@ def handle_create_task(event: dict, tasks_table, tasks_queue) -> dict:
                 "task_id": task_id,
             },
         )
+        try:
+            idempotency_table.delete_item(Key={"idempotency_key": idempotency_key})
+        except ClientError:
+            logger.exception(
+                "Failed to rollback idempotency record after task write failure",
+                extra={
+                    "component": "api",
+                    "correlation_id": correlation_id,
+                    "event": "idempotency_rollback_error",
+                    "idempotency_key": idempotency_key,
+                },
+            )
         return json_response(500, {"error": "Failed to create task"})
 
     logger.info(
@@ -300,6 +385,7 @@ def handler(event, context):
         return json_response(500, {"error": "Internal server error"})
 
     tasks_table = get_tasks_table()
+    idempotency_table = get_idempotency_table()
 
     sqs_resource = boto3.resource("sqs")
     tasks_queue = sqs_resource.Queue(tasks_queue_url)  # type: ignore[attr-defined]
@@ -322,7 +408,7 @@ def handler(event, context):
         return handle_hello(event, correlation_id=correlation_id)
 
     if path == "/tasks" and method == "POST":
-        return handle_create_task(event, tasks_table, tasks_queue)
+        return handle_create_task(event, tasks_table, idempotency_table, tasks_queue)
 
     if path.startswith("/tasks/") and method == "GET":
         return handle_get_task(event, tasks_table, correlation_id=correlation_id)

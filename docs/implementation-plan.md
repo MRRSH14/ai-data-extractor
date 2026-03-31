@@ -27,7 +27,7 @@ These came from **this thread** and related chats; they **extend** the baseline,
 
 | # | Topic | Notes | Suggested priority |
 |---|--------|--------|-------------------|
-| A | **Idempotent task submission** | Often what people mean by “omnipotent”: safe retries / dedupe so the same logical request does not create duplicate work (client key, hash of payload, etc.). | **P1** after core API semantics are stable |
+| A | **Idempotent task submission** | Safe retries / dedupe so the same logical request does not create duplicate work. Implemented approach: **server-side deterministic hash key** (`tenant_id` + `created_by` + `job_type` + canonicalized `input`) stored in a dedicated idempotency table with **1-week TTL**. | **P1** after core API semantics are stable |
 | B | **Caching** | What to cache (e.g. `GET /tasks/{id}`, model outputs), where (edge, Lambda, dedicated cache), invalidation when status changes. | **P2** when read patterns or cost justify |
 | C | **DynamoDB lifecycle** | TTL on task items (or a `ttl` attribute), PITR/backups for audit/DR, capacity mode vs cost. | **P2** with compliance/retention needs |
 | D | **S3 + lifecycle for results** | Large/binary outputs in S3, pointer/metadata in DynamoDB; lifecycle rules (expire, tier); IAM scoped per tenant prefix. | **P2** with AI/heavy results |
@@ -85,7 +85,7 @@ These came from **this thread** and related chats; they **extend** the baseline,
 
 ## Checklist — extended topics (optional / later)
 
-- [ ] **(A)** Idempotency design + ADR or API contract (`Idempotency-Key` or server-side dedupe)
+- [x] **(A)** Idempotency design + server-side dedupe implementation (deterministic hash + dedicated table + 1-week TTL)
 - [ ] **(B)** Caching strategy doc (only if you have a concrete read pattern)
 - [ ] **(C)** DynamoDB TTL / backup posture documented
 - [ ] **(D)** S3 results bucket + lifecycle + worker write path (when AI/results land)

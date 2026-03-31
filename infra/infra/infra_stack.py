@@ -33,6 +33,16 @@ class InfraStack(Stack):
             ),
             removal_policy=RemovalPolicy.DESTROY,
         )
+        idempotency_table = dynamodb.Table(
+            self,
+            "TaskIdempotencyTable",
+            partition_key=dynamodb.Attribute(
+                name="idempotency_key",
+                type=dynamodb.AttributeType.STRING,
+            ),
+            time_to_live_attribute="expires_at",
+            removal_policy=RemovalPolicy.DESTROY,
+        )
 
         dead_letter_queue = sqs.Queue(
             self,
@@ -114,6 +124,7 @@ class InfraStack(Stack):
             code=_lambda.Code.from_asset("../src"),
             environment={
                 "TASKS_TABLE_NAME": tasks_table.table_name,
+                "IDEMPOTENCY_TABLE_NAME": idempotency_table.table_name,
                 "TASKS_QUEUE_URL": tasks_queue.queue_url,
             },
         )
@@ -139,6 +150,7 @@ class InfraStack(Stack):
         )
 
         tasks_table.grant_read_write_data(api_lambda)
+        idempotency_table.grant_read_write_data(api_lambda)
 
         tasks_queue.grant_send_messages(api_lambda)
 

@@ -95,6 +95,29 @@ if [[ -z "$task_id" ]]; then
 fi
 echo "[INFO] Created task_id=$task_id"
 
+# 4b) Repeat same create request should be idempotent (same task_id)
+read -r code resp < <(http_status POST "$API_URL/tasks" "$TEST_ID_TOKEN" '{"job_type":"demo","input":{"hello":"world"}}')
+if [[ "$code" != "200" && "$code" != "202" ]]; then
+  echo "[FAIL] POST /tasks idempotent retry expected 200/202 got $code"
+  exit 1
+fi
+retry_task_id="$(
+  python3 - <<'PY' "$resp"
+import json,sys
+payload = json.loads(sys.argv[1])
+print(payload.get("task_id",""))
+PY
+)"
+if [[ -z "$retry_task_id" ]]; then
+  echo "[FAIL] Could not parse task_id from idempotent retry response"
+  exit 1
+fi
+if [[ "$retry_task_id" != "$task_id" ]]; then
+  echo "[FAIL] Idempotent retry returned different task_id: $retry_task_id (expected $task_id)"
+  exit 1
+fi
+echo "[PASS] POST /tasks idempotent retry returns same task_id ($retry_task_id)"
+
 # 5) Protected get with same token should pass
 read -r code resp < <(http_status GET "$API_URL/tasks/$task_id" "$TEST_ID_TOKEN")
 assert_status "GET /tasks/{id} same tenant" "$code" "200"

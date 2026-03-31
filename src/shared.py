@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import uuid
+import hashlib
 from datetime import datetime, timezone
 
 import boto3
@@ -63,6 +64,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 dynamodb = boto3.resource("dynamodb")
+IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60
 
 
 def json_response(status_code: int, payload: dict) -> dict:
@@ -88,6 +90,38 @@ def get_tasks_table():
         logger.error("TASKS_TABLE_NAME environment variable is not set")
         raise RuntimeError("Missing TASKS_TABLE_NAME environment variable")
     return dynamodb.Table(tasks_table_name)
+
+
+def get_idempotency_table():
+    table_name = os.getenv("IDEMPOTENCY_TABLE_NAME")
+    if not table_name:
+        logger.error("IDEMPOTENCY_TABLE_NAME environment variable is not set")
+        raise RuntimeError("Missing IDEMPOTENCY_TABLE_NAME environment variable")
+    return dynamodb.Table(table_name)
+
+
+def build_idempotency_key(
+    *,
+    tenant_id: str,
+    created_by: str,
+    job_type: str,
+    input_value,
+    version: str = "idem:v1",
+) -> str:
+    canonical_payload = {
+        "v": version,
+        "tenant_id": tenant_id,
+        "created_by": created_by,
+        "job_type": job_type,
+        "input": input_value,
+    }
+    canonical_json = json.dumps(
+        canonical_payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
 
 def update_task_status(

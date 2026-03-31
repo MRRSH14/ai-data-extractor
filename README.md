@@ -24,7 +24,7 @@ Rationale is recorded in [ADR 0001](docs/adrs/0001-async-task-pattern.md). DLQ h
 |--------|------|---------|
 | `GET` | `/health` | Liveness-style check (`{"ok": true}`). **Public** |
 | `GET` | `/hello` | Sample query param `name` (demo / smoke). **Public** |
-| `POST` | `/tasks` | Create a task. JSON body: `job_type` (string), `input` (any). Returns **202** with task including `task_id` and `status`. **JWT required** |
+| `POST` | `/tasks` | Create a task. JSON body: `job_type` (string), `input` (any). Returns **202** with task including `task_id` and `status`. Repeating the same logical request by the same user/tenant returns the existing task via server-side idempotency. **JWT required** |
 | `GET` | `/tasks/{id}` | Return the task item from DynamoDB or **404**. **JWT required** |
 
 **Security note:** API Gateway now uses a Cognito User Pool JWT authorizer for task routes, and task handlers enforce tenant ownership using JWT claims. `/health` and `/hello` remain public.
@@ -102,6 +102,12 @@ Use this quick check after onboarding a user to confirm tenant isolation still w
 1. `POST /tasks` with the onboarded user token -> expect `202`.
 2. `GET /tasks/{id}` with the same user token -> expect `200`.
 3. `GET /tasks/{id}` with a token from a different tenant -> expect `403`.
+
+### Idempotency behavior (server-side)
+
+- `POST /tasks` computes a deterministic hash from caller/task inputs (`tenant_id`, `created_by`, `job_type`, canonicalized `input`) and uses that as an internal idempotency key.
+- Idempotency records live in a dedicated DynamoDB table (`TaskIdempotencyTable`) with TTL (`expires_at`) set to **1 week**.
+- First request creates/enqueues task as normal; same logical retry returns the existing task (no duplicate enqueue).
 
 ## Roadmap summary
 
