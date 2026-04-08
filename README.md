@@ -1,14 +1,23 @@
-# aws-ai-platform-service
+# ai-data-extractor
 
-A **production-style async task API** on AWS: API Gateway HTTP API, Lambda, SQS, DynamoDB, and a dead-letter queue with optional email alerts. The codebase is intentionally a **foundation**—clear boundaries for later **auth, tenancy, observability, and AI workloads**—not a complete AI product.
+A **schema-driven async data extraction service** on AWS, bootstrapped from `platform-v1` of `aws-ai-platform-service`. The repository currently keeps the proven platform baseline (API Gateway HTTP API, Lambda, SQS, DynamoDB, DLQ, auth/tenancy, observability, idempotency) and is now focused on implementing the first extraction product workflow.
 
 ## What this project is
 
-- **HTTP API** for health checks, a sample `hello` route, and **task lifecycle**: create a task (`POST /tasks`), poll status (`GET /tasks/{id}`).
+- **HTTP API** for health checks and task lifecycle (`POST /tasks`, `GET /tasks/{id}`), currently serving as the product backbone.
 - **Asynchronous execution** via a **tasks queue** and a **worker Lambda** that updates task state in **DynamoDB**.
-- **Infrastructure as code** with **AWS CDK** (Python) and a **manual** GitHub Actions deploy workflow.
+- **Infrastructure as code** with **AWS CDK** (Python) and a manual GitHub Actions deploy workflow.
 
-See **[docs/architecture.md](docs/architecture.md)** for diagrams, request flow, task states, and current limitations.
+See **[docs/architecture.md](docs/architecture.md)** for baseline diagrams and request flow. Product-specific extraction behavior is tracked in the implementation plan and will be added incrementally.
+
+## Product direction (next)
+
+The next product milestone is **file/text extraction into structured JSON**:
+
+- User submits extraction task input (text or file pointer) plus desired result schema.
+- Worker performs extraction and validates output shape.
+- Task status and result are retrievable through the existing async task pattern.
+- Existing platform qualities (tenant isolation, observability, idempotency, DLQ) remain in place.
 
 ## Why this architecture
 
@@ -113,9 +122,9 @@ Use this quick check after onboarding a user to confirm tenant isolation still w
 
 | Phase | Focus |
 |-------|--------|
-| **Current** | Async skeleton + auth boundary: API + SQS + worker + DynamoDB + DLQ + Cognito JWT protection on task routes; docs and ADRs. |
-| **Next** | Strengthen tenant onboarding/migration details; extend **metrics/dashboards** as usage grows (structured logs and correlation IDs are in place—see [observability](docs/observability.md)). |
-| **Later** | **AI layer**: provider abstraction, task payload for model work, worker execution, persistence, cost/guardrails—**after** the platform boundary is credible. |
+| **Current** | Platform baseline from `platform-v1`: async API + worker, auth/tenancy, observability, idempotency, and operational docs. |
+| **Next** | Extractor MVP: schema-driven extraction contract, worker extraction flow, result persistence/retrieval, and validation/error semantics. |
+| **Later** | Advanced extraction features (larger files, richer formats, quality controls, cost/performance tuning, optional UI/workflow integrations). |
 
 ## Documentation index
 

@@ -6,6 +6,20 @@
 
 ---
 
+## Product track: ai-data-extractor
+
+This repository is now productized from the `platform-v1` baseline. Treat the existing 4-week platform sprint below as completed foundation context, and execute the next milestones under this product track.
+
+### Near-term milestones (extractor MVP)
+
+- [ ] Define extraction API contract (`job_type`, text/file input shape, schema payload, limits).
+- [ ] Implement worker extraction path for one supported input type (text first, then file pointer).
+- [ ] Validate model output against requested schema and persist deterministic result/status.
+- [ ] Add retrieval shape for extraction result and clear failure/error semantics.
+- [ ] Add runbook/test flow for extraction success, malformed input, and retry/DLQ behavior.
+
+---
+
 ## Original 4-week sprint (baseline)
 
 This is the plan you started from; it prioritizes **documentation, state semantics, auth/tenancy, observability** before the AI layer.
