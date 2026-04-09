@@ -19,6 +19,17 @@ The next product milestone is **file/text extraction into structured JSON**:
 - Task status and result are retrievable through the existing async task pattern.
 - Existing platform qualities (tenant isolation, observability, idempotency, DLQ) remain in place.
 
+## Why this product exists
+
+`ai-data-extractor` is a schema-driven, multi-tenant extraction backend that turns unstructured text/files into predictable JSON with production-grade reliability, security, and observability.
+
+### When to use this vs ChatGPT UI
+
+- Use **ChatGPT UI** for ad-hoc, human-driven, one-off extraction.
+- Use **ai-data-extractor** when extraction must be automated, repeatable, auditable, and integrated into backend workflows.
+- Choose this service when you need tenant isolation, idempotent task submission, retry/DLQ operations, and consistent result contracts.
+- Use this platform when downstream systems require machine-consumable structured output at scale.
+
 ## Why this architecture
 
 - **API Lambda** stays focused on validation, persistence, and enqueueing; it returns quickly with a `task_id` (**202 Accepted**).
@@ -129,6 +140,7 @@ Use this quick check after onboarding a user to confirm tenant isolation still w
 ## Documentation index
 
 - [Architecture](docs/architecture.md)
+- [MVP extractor contract](docs/mvp-extractor.md)
 - [Observability](docs/observability.md)
 - [Implementation plan (living roadmap & checklist)](docs/implementation-plan.md)
 - [ADR 0001 — Async task pattern](docs/adrs/0001-async-task-pattern.md)

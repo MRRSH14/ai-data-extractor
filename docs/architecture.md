@@ -135,6 +135,34 @@ This service is **single-region** and relies on **managed** API Gateway, Lambda,
 
 **Documentation-only extensions** (idempotency, caching, DynamoDB TTL/S3 results, LocalStack, GSIs for list-by-tenant) live in **[implementation-plan.md](implementation-plan.md)** so the architecture doc stays tied to what is implemented *today*.
 
+## When to introduce Textract and Step Functions
+
+For MVP, neither is required because the service accepts inline text and runs a single async worker step (`API -> SQS -> worker -> DynamoDB`).
+
+| Capability | Introduce when | Why | Keep out when |
+|---|---|---|---|
+| **Amazon Textract** | Inputs include PDFs, scans, images, forms, or tables that require OCR/layout extraction. | Converts document/image content into machine-readable text/structure before LLM extraction. | Callers already provide clean text (`input.text`) and no OCR/layout parsing is needed. |
+| **AWS Step Functions** | Workflow becomes multi-step/branching (e.g., file ingest -> OCR -> extraction -> validation -> post-processing), long-running, or needs per-step retries/visibility. | Adds explicit orchestration, per-step state, and operator visibility across complex pipelines. | Processing is a simple single worker flow where SQS + Lambda retries + DLQ are sufficient. |
+
+Practical sequence for this product:
+
+1. **Now (MVP):** text-only extraction with current async pattern.
+2. **Next (file mode):** add document ingestion and Textract where OCR/layout is needed.
+3. **Later (complex pipelines):** introduce Step Functions once multiple dependent stages justify orchestration overhead.
+
+## Advanced feature evolution (post-MVP)
+
+These are candidate capabilities to grow from extraction MVP to a more complete platform.
+
+- **File ingestion mode:** support S3 pointers/presigned upload flows, with optional Textract for scanned documents.
+- **Schema richness:** nested objects/arrays, enums, stronger type constraints, and reusable schema templates.
+- **Quality controls:** confidence scoring, field-level provenance snippets, and configurable validation strictness.
+- **Human review loop:** optional review queue for low-confidence outputs before downstream commit.
+- **Result storage strategy:** large output artifacts in S3 with DynamoDB metadata pointers and lifecycle policies.
+- **Listing/query APIs:** tenant/user list endpoints backed by GSIs and pagination contracts.
+- **Performance and cost tuning:** batching, model routing, concurrency controls, timeout tuning, and budget guardrails.
+- **Workflow orchestration:** Step Functions for multi-step pipelines and richer operational state tracking.
+
 ## Related documents
 
 - [README](../README.md) — overview, endpoints, deploy, roadmap summary
