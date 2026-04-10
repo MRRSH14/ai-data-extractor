@@ -12,9 +12,9 @@ A caller submits a task with `job_type=extract` and provides:
 
 For MVP, file paths, S3 pointers, and uploaded files are out of scope for execution input. Those are planned as a later mode.
 
-The worker calls Claude via **Amazon Bedrock** (`bedrock-runtime`), validates the response against the schema, and persists the result. The caller polls `GET /tasks/{id}` until status is `completed` or `failed`.
+For the current MVP implementation, the worker uses a deterministic extraction stub (no live model call yet), validates payload/schema shape, and persists the result. The caller polls `GET /tasks/{id}` until status is `completed` or `failed`.
 
-**LLM backend:** Amazon Bedrock (`bedrock-runtime`). Auth is IAM — no API keys. The worker Lambda needs an `bedrock:InvokeModel` grant on the target model ARN (added to CDK at implementation time). No third-party SDK bundling required; `boto3` covers the Bedrock client.
+**LLM backend (next increment):** Claude via Amazon Bedrock (`bedrock-runtime`). Auth is IAM — no API keys. The worker Lambda will need an `bedrock:InvokeModel` grant on the target model ARN (added to CDK when Bedrock integration is enabled). No third-party SDK bundling required; `boto3` covers the Bedrock client.
 
 ---
 
@@ -155,8 +155,8 @@ queued → running → completed
 | `text` empty or > 32 KB | API returns **400** | No | Rejected at API layer before task is created |
 | `schema` missing or empty | API returns **400** | No | Rejected at API layer |
 | Unknown `mode` value | API returns **400** | No | Only `"text"` supported in MVP |
-| Required schema field absent in LLM output | `failed` | No | Non-retryable; bad LLM extraction |
-| LLM returns un-parseable JSON | `failed` | No | Non-retryable; prompt or model issue |
+| Required schema field absent in extraction output | `failed` | No | Non-retryable contract/validation issue |
+| Worker payload/schema validation fails | `failed` | No | Non-retryable malformed input path |
 | Bedrock timeout / network error | `retrying` | Yes | SQS retries up to `maxReceiveCount`; then DLQ |
 | Bedrock throttling (`ThrottlingException`) | `retrying` | Yes | Same retry path |
 | Worker crash / unhandled exception | `retrying` | Yes | Same retry path |

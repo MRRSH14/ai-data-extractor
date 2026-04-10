@@ -70,7 +70,7 @@ read -r code resp < <(http_status GET "$API_URL/hello?name=dev")
 assert_status "GET /hello public" "$code" "200"
 
 # 3) Protected create without token should fail
-read -r code resp < <(http_status POST "$API_URL/tasks" "" '{"job_type":"demo","input":{"hello":"world"}}')
+read -r code resp < <(http_status POST "$API_URL/tasks" "" '{"job_type":"extract","input":{"mode":"text","text":"Invoice 100 total 42.5 paid","schema":{"invoice_id":{"type":"string"},"amount":{"type":"number"},"is_paid":{"type":"boolean"}}}}')
 if [[ "$code" != "401" && "$code" != "403" ]]; then
   echo "[FAIL] POST /tasks without token expected 401/403 got $code"
   exit 1
@@ -78,7 +78,8 @@ fi
 echo "[PASS] POST /tasks requires token ($code)"
 
 # 4) Protected create with test token should pass
-read -r code resp < <(http_status POST "$API_URL/tasks" "$TEST_ID_TOKEN" '{"job_type":"demo","input":{"hello":"world"}}')
+extract_payload='{"job_type":"extract","input":{"mode":"text","text":"Invoice 100 total 42.5 paid","schema":{"invoice_id":{"type":"string"},"amount":{"type":"number"},"is_paid":{"type":"boolean"}}}}'
+read -r code resp < <(http_status POST "$API_URL/tasks" "$TEST_ID_TOKEN" "$extract_payload")
 assert_status "POST /tasks with test token" "$code" "202"
 
 task_id="$(
@@ -96,7 +97,7 @@ fi
 echo "[INFO] Created task_id=$task_id"
 
 # 4b) Repeat same create request should be idempotent (same task_id)
-read -r code resp < <(http_status POST "$API_URL/tasks" "$TEST_ID_TOKEN" '{"job_type":"demo","input":{"hello":"world"}}')
+read -r code resp < <(http_status POST "$API_URL/tasks" "$TEST_ID_TOKEN" "$extract_payload")
 if [[ "$code" != "200" && "$code" != "202" ]]; then
   echo "[FAIL] POST /tasks idempotent retry expected 200/202 got $code"
   exit 1
@@ -118,9 +119,56 @@ if [[ "$retry_task_id" != "$task_id" ]]; then
 fi
 echo "[PASS] POST /tasks idempotent retry returns same task_id ($retry_task_id)"
 
-# 5) Protected get with same token should pass
-read -r code resp < <(http_status GET "$API_URL/tasks/$task_id" "$TEST_ID_TOKEN")
-assert_status "GET /tasks/{id} same tenant" "$code" "200"
+# 5) Poll task until terminal state and validate extractor result
+poll_attempt=1
+max_attempts=10
+last_resp=""
+while [[ "$poll_attempt" -le "$max_attempts" ]]; do
+  read -r code resp < <(http_status GET "$API_URL/tasks/$task_id" "$TEST_ID_TOKEN")
+  assert_status "GET /tasks/{id} same tenant (attempt $poll_attempt)" "$code" "200"
+  status="$(
+    python3 - <<'PY' "$resp"
+import json,sys
+payload = json.loads(sys.argv[1])
+print(payload.get("status",""))
+PY
+  )"
+  last_resp="$resp"
+  if [[ "$status" == "completed" || "$status" == "failed" ]]; then
+    break
+  fi
+  sleep 1
+  poll_attempt=$((poll_attempt + 1))
+done
+
+if [[ -z "$last_resp" ]]; then
+  echo "[FAIL] Empty task response while polling"
+  exit 1
+fi
+
+python3 - <<'PY' "$last_resp"
+import json,sys
+payload = json.loads(sys.argv[1])
+status = payload.get("status")
+if status != "completed":
+    print(f"[FAIL] Expected completed status, got {status!r}")
+    sys.exit(1)
+result = payload.get("result")
+if not isinstance(result, dict):
+    print("[FAIL] Expected result object on completed task")
+    sys.exit(1)
+for key in ("invoice_id", "amount", "is_paid"):
+    if key not in result:
+        print(f"[FAIL] Missing expected result key: {key}")
+        sys.exit(1)
+if not isinstance(result.get("amount"), (int, float)):
+    print("[FAIL] result.amount must be numeric")
+    sys.exit(1)
+if not isinstance(result.get("is_paid"), bool):
+    print("[FAIL] result.is_paid must be boolean")
+    sys.exit(1)
+print("[PASS] Extractor task completed with expected result shape")
+PY
 
 # 6) Optional cross-tenant check
 if [[ -n "${DEMO_ID_TOKEN:-}" ]]; then

@@ -117,6 +117,7 @@ Use this model to avoid confusion during incidents:
 
 ## Operational notes
 
+- **Extractor deterministic failures:** malformed extractor payload/schema issues are marked `failed` and are not retried; these do not reach the DLQ.
 - **Current behavior:** For transient failures, the worker keeps failing the invocation so SQS can retry and eventually move the message to the DLQ after `maxReceiveCount`.
 - **DLQ processing mode:** There is no automatic DLQ consumer Lambda; messages remain in DLQ for manual inspection and redrive.
 - **Alert behavior:** Alarm is tuned for fast detection (`>= 1` visible DLQ message, 1-minute period). Keep notifications enabled and verify SNS email subscriptions after deploy.
