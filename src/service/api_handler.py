@@ -18,6 +18,81 @@ from shared import (
 )
 
 
+MAX_TEXT_LENGTH = 32768
+MAX_SCHEMA_FIELDS = 20
+ALLOWED_SCHEMA_TYPES = {"string", "number", "boolean"}
+
+
+def _validation_error(correlation_id: str, message: str) -> dict:
+    logger.warning(
+        message,
+        extra={
+            "component": "api",
+            "correlation_id": correlation_id,
+            "event": "validation_error",
+        },
+    )
+    return json_response(400, {"error": message})
+
+
+def _validate_extract_input(input_value: object, *, correlation_id: str) -> dict | None:
+    if not isinstance(input_value, dict):
+        return _validation_error(correlation_id, "input must be an object")
+
+    mode = input_value.get("mode")
+    if mode != "text":
+        return _validation_error(correlation_id, 'input.mode must be "text"')
+
+    text = input_value.get("text")
+    if not isinstance(text, str):
+        return _validation_error(correlation_id, "input.text must be a string")
+    if not text.strip():
+        return _validation_error(correlation_id, "input.text must be non-empty")
+    if len(text) > MAX_TEXT_LENGTH:
+        return _validation_error(
+            correlation_id, f"input.text exceeds max length of {MAX_TEXT_LENGTH}"
+        )
+
+    schema = input_value.get("schema")
+    if not isinstance(schema, dict) or not schema:
+        return _validation_error(correlation_id, "input.schema must be a non-empty object")
+    if len(schema) > MAX_SCHEMA_FIELDS:
+        return _validation_error(
+            correlation_id, f"input.schema exceeds max fields of {MAX_SCHEMA_FIELDS}"
+        )
+
+    for field_name, descriptor in schema.items():
+        if not isinstance(field_name, str) or not field_name.strip():
+            return _validation_error(correlation_id, "input.schema field names must be non-empty strings")
+        if not isinstance(descriptor, dict):
+            return _validation_error(
+                correlation_id, f'input.schema["{field_name}"] must be an object'
+            )
+
+        field_type = descriptor.get("type")
+        if field_type not in ALLOWED_SCHEMA_TYPES:
+            return _validation_error(
+                correlation_id,
+                f'input.schema["{field_name}"].type must be one of {sorted(ALLOWED_SCHEMA_TYPES)}',
+            )
+
+        description = descriptor.get("description")
+        if description is not None and not isinstance(description, str):
+            return _validation_error(
+                correlation_id,
+                f'input.schema["{field_name}"].description must be a string when provided',
+            )
+
+        required = descriptor.get("required")
+        if required is not None and not isinstance(required, bool):
+            return _validation_error(
+                correlation_id,
+                f'input.schema["{field_name}"].required must be a boolean when provided',
+            )
+
+    return None
+
+
 def get_jwt_claims(event: dict) -> dict:
     request_context = event.get("requestContext", {})
     authorizer = request_context.get("authorizer", {})
@@ -173,26 +248,16 @@ def handle_create_task(event: dict, tasks_table, idempotency_table, tasks_queue)
     input_value = body.get("input")
 
     if not job_type:
-        logger.warning(
-            "Missing required field: job_type",
-            extra={
-                "component": "api",
-                "correlation_id": correlation_id,
-                "event": "validation_error",
-            },
-        )
-        return json_response(400, {"error": "job_type is required"})
+        return _validation_error(correlation_id, "job_type is required")
+    if job_type != "extract":
+        return _validation_error(correlation_id, 'job_type must be "extract"')
 
     if input_value is None:
-        logger.warning(
-            "Missing required field: input",
-            extra={
-                "component": "api",
-                "correlation_id": correlation_id,
-                "event": "validation_error",
-            },
-        )
-        return json_response(400, {"error": "input is required"})
+        return _validation_error(correlation_id, "input is required")
+
+    validation_result = _validate_extract_input(input_value, correlation_id=correlation_id)
+    if validation_result:
+        return validation_result
 
     tenant_id, created_by = get_identity_from_claims(event)
     if not tenant_id:
