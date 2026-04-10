@@ -12,10 +12,10 @@ This repository is now productized from the `platform-v1` baseline. Treat the ex
 
 ### Near-term milestones (extractor MVP)
 
-- [ ] Define extraction API contract (`job_type`, text/file input shape, schema payload, limits).
+- [ ] Define extraction API contract (`job_type="extract"`), text-first input shape (`input.mode="text"`), schema payload, and limits.
 - [ ] Implement worker extraction path for one supported input type (text first, then file pointer).
 - [ ] Validate model output against requested schema and persist deterministic result/status.
-- [ ] Add retrieval shape for extraction result and clear failure/error semantics.
+- [ ] Add retrieval shape for extraction result and clear failure/error semantics (`failed` for deterministic malformed payload/output, `retrying` for transient processing failures).
 - [ ] Add runbook/test flow for extraction success, malformed input, and retry/DLQ behavior.
 
 ---

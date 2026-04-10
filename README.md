@@ -12,11 +12,12 @@ See **[docs/architecture.md](docs/architecture.md)** for baseline diagrams and r
 
 ## Product direction (next)
 
-The next product milestone is **file/text extraction into structured JSON**:
+The next product milestone is **extractor MVP (text-first) into structured JSON**:
 
-- User submits extraction task input (text or file pointer) plus desired result schema.
+- User submits `job_type="extract"` with inline text (`input.mode="text"`) plus desired result schema.
 - Worker performs extraction and validates output shape.
 - Task status and result are retrievable through the existing async task pattern.
+- Deterministic malformed payload/output paths are treated as terminal `failed`; transient failures continue through retry/DLQ.
 - Existing platform qualities (tenant isolation, observability, idempotency, DLQ) remain in place.
 
 ## Why this product exists
@@ -44,7 +45,7 @@ Rationale is recorded in [ADR 0001](docs/adrs/0001-async-task-pattern.md). DLQ h
 |--------|------|---------|
 | `GET` | `/health` | Liveness-style check (`{"ok": true}`). **Public** |
 | `GET` | `/hello` | Sample query param `name` (demo / smoke). **Public** |
-| `POST` | `/tasks` | Create a task. JSON body: `job_type` (string), `input` (any). Returns **202** with task including `task_id` and `status`. Repeating the same logical request by the same user/tenant returns the existing task via server-side idempotency. **JWT required** |
+| `POST` | `/tasks` | Create an extraction task. MVP contract: `job_type="extract"` and text-mode input (`input.mode="text"`, `input.text`, `input.schema`). Returns **202** with task metadata; repeated logical requests by the same user/tenant return the existing task via server-side idempotency. **JWT required** |
 | `GET` | `/tasks/{id}` | Return the task item from DynamoDB or **404**. **JWT required** |
 
 **Security note:** API Gateway now uses a Cognito User Pool JWT authorizer for task routes, and task handlers enforce tenant ownership using JWT claims. `/health` and `/hello` remain public.
