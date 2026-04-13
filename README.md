@@ -66,6 +66,8 @@ export BEDROCK_REGION="us-east-1"                   # optional; defaults to stac
 cdk deploy
 ```
 
+When `BEDROCK_MODEL_ID` is set at deploy time, CDK scopes worker IAM `bedrock:InvokeModel` permission to that specific model ARN.
+
 Stack outputs include **ApiUrl**, **TasksQueueUrl**, **DeadLetterQueueUrl**, **TasksUserPoolId**, **TasksUserPoolClientId**, and related ARNs.
 
 **CI:** [`.github/workflows/cdk-deploy.yml`](.github/workflows/cdk-deploy.yml) runs on **workflow_dispatch**, assumes an AWS role via OIDC, sets `DLQ_ALERT_EMAIL` from **GitHub Actions secrets**, and runs `cdk deploy` from the `infra/` directory.

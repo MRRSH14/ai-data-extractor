@@ -143,6 +143,8 @@ class InfraStack(Stack):
                 "BEDROCK_REGION": os.getenv("BEDROCK_REGION", ""),
             },
         )
+        bedrock_model_id = os.getenv("BEDROCK_MODEL_ID", "").strip()
+        bedrock_region = os.getenv("BEDROCK_REGION", "").strip() or self.region
 
         worker_lambda.add_event_source(
             SqsEventSource(
@@ -164,10 +166,19 @@ class InfraStack(Stack):
 
         tasks_queue.grant_consume_messages(worker_lambda)
         tasks_table.grant_read_write_data(worker_lambda)
+        bedrock_resource_arns: list[str]
+        if bedrock_model_id:
+            bedrock_resource_arns = [
+                f"arn:aws:bedrock:{bedrock_region}::foundation-model/{bedrock_model_id}"
+            ]
+        else:
+            # Keep deploys working if BEDROCK_MODEL_ID isn't set yet.
+            # Runtime behavior still depends on worker env configuration.
+            bedrock_resource_arns = ["*"]
         worker_lambda.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["bedrock:InvokeModel"],
-                resources=["*"],
+                resources=bedrock_resource_arns,
             )
         )
 
