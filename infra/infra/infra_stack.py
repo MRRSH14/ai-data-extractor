@@ -8,6 +8,7 @@ from aws_cdk import (
     aws_sns_subscriptions as sns_subscriptions,
     aws_cloudwatch_actions as cw_actions,
     aws_cognito as cognito,
+    aws_iam as iam,
 )
 from constructs import Construct
 from aws_cdk.aws_apigatewayv2 import HttpApi, HttpMethod
@@ -138,6 +139,8 @@ class InfraStack(Stack):
             timeout=Duration.seconds(30),
             environment={
                 "TASKS_TABLE_NAME": tasks_table.table_name,
+                "BEDROCK_MODEL_ID": os.getenv("BEDROCK_MODEL_ID", ""),
+                "BEDROCK_REGION": os.getenv("BEDROCK_REGION", ""),
             },
         )
 
@@ -161,6 +164,12 @@ class InfraStack(Stack):
 
         tasks_queue.grant_consume_messages(worker_lambda)
         tasks_table.grant_read_write_data(worker_lambda)
+        worker_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["bedrock:InvokeModel"],
+                resources=["*"],
+            )
+        )
 
         http_api = HttpApi(
             self,

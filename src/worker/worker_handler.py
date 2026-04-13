@@ -1,7 +1,11 @@
 import json
+import os
 import re
 import time
 from datetime import datetime, timezone
+
+import boto3  # type: ignore[reportMissingImports]
+from botocore.exceptions import ClientError  # type: ignore[reportMissingImports]
 
 from shared import logger, get_tasks_table, update_task_status
 
@@ -97,6 +101,137 @@ def _validate_extract_payload(payload: dict) -> tuple[str, dict]:
     return text, schema
 
 
+def _coerce_and_validate_result(raw_result: object, schema: dict) -> dict:
+    if not isinstance(raw_result, dict):
+        raise NonRetryableProcessingError("model output must be a JSON object")
+
+    normalized: dict = {}
+    for field_name, descriptor in schema.items():
+        if not isinstance(field_name, str) or not field_name.strip():
+            raise NonRetryableProcessingError("schema field names must be non-empty strings")
+        if not isinstance(descriptor, dict):
+            raise NonRetryableProcessingError(
+                f'schema descriptor for "{field_name}" must be an object'
+            )
+
+        field_type = descriptor.get("type")
+        required = bool(descriptor.get("required", False))
+        value = raw_result.get(field_name)
+        if value is None:
+            if required:
+                raise NonRetryableProcessingError(
+                    f'required field "{field_name}" missing from model output'
+                )
+            continue
+
+        if field_type == "string":
+            if not isinstance(value, str):
+                value = str(value)
+        elif field_type == "number":
+            if isinstance(value, bool):
+                raise NonRetryableProcessingError(
+                    f'field "{field_name}" must be a number, got boolean'
+                )
+            if not isinstance(value, (int, float)):
+                try:
+                    value = float(str(value))
+                except (TypeError, ValueError):
+                    raise NonRetryableProcessingError(
+                        f'field "{field_name}" must be numeric'
+                    ) from None
+        elif field_type == "boolean":
+            if isinstance(value, bool):
+                pass
+            elif isinstance(value, str):
+                lowered = value.strip().lower()
+                if lowered in {"true", "yes", "1"}:
+                    value = True
+                elif lowered in {"false", "no", "0"}:
+                    value = False
+                else:
+                    raise NonRetryableProcessingError(
+                        f'field "{field_name}" must be boolean'
+                    )
+            else:
+                raise NonRetryableProcessingError(f'field "{field_name}" must be boolean')
+        else:
+            raise NonRetryableProcessingError(
+                f'schema type for "{field_name}" must be string, number, or boolean'
+            )
+
+        normalized[field_name] = value
+
+    return normalized
+
+
+def _bedrock_client():
+    region = os.getenv("BEDROCK_REGION")
+    if region:
+        return boto3.client("bedrock-runtime", region_name=region)
+    return boto3.client("bedrock-runtime")
+
+
+def _build_model_prompt(text: str, schema: dict) -> str:
+    schema_json = json.dumps(schema, ensure_ascii=True, sort_keys=True)
+    return (
+        "Extract fields from the provided text using the schema.\n"
+        "Return only a JSON object with top-level keys from schema.\n"
+        "Do not include markdown, explanations, or extra keys.\n\n"
+        f"Schema:\n{schema_json}\n\n"
+        f"Text:\n{text}"
+    )
+
+
+def _invoke_bedrock_extract(text: str, schema: dict) -> dict:
+    model_id = os.getenv("BEDROCK_MODEL_ID")
+    if not model_id:
+        raise NonRetryableProcessingError("BEDROCK_MODEL_ID is not configured")
+
+    body = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 512,
+        "temperature": 0,
+        "messages": [{"role": "user", "content": _build_model_prompt(text, schema)}],
+    }
+
+    try:
+        client = _bedrock_client()
+        response = client.invoke_model(
+            modelId=model_id,
+            contentType="application/json",
+            accept="application/json",
+            body=json.dumps(body),
+        )
+    except ClientError:
+        logger.exception("Bedrock invoke failed", extra={"component": "worker", "event": "bedrock_error"})
+        raise
+
+    raw_body = response.get("body")
+    if raw_body is None:
+        raise NonRetryableProcessingError("Bedrock response body is missing")
+
+    response_json = json.loads(raw_body.read())
+    content = response_json.get("content")
+    if not isinstance(content, list) or not content:
+        raise NonRetryableProcessingError("Bedrock response content is missing")
+
+    first_block = content[0]
+    if not isinstance(first_block, dict):
+        raise NonRetryableProcessingError("Bedrock response content block is invalid")
+    text_output = first_block.get("text")
+    if not isinstance(text_output, str) or not text_output.strip():
+        raise NonRetryableProcessingError("Bedrock text output is missing")
+
+    try:
+        parsed = json.loads(text_output)
+    except json.JSONDecodeError as exc:
+        raise NonRetryableProcessingError(
+            f"model output is not valid JSON: {exc.msg}"
+        ) from None
+
+    return _coerce_and_validate_result(parsed, schema)
+
+
 def _extract_number(text: str) -> float:
     match = re.search(r"-?\d+(?:\.\d+)?", text.replace(",", ""))
     if not match:
@@ -111,6 +246,7 @@ def _extract_boolean(text: str) -> bool:
 
 
 def _build_result(text: str, schema: dict) -> dict:
+    """Deterministic fallback used when Bedrock isn't enabled."""
     result: dict = {}
     compact_text = " ".join(text.strip().split())
     for field_name, descriptor in schema.items():
@@ -172,10 +308,12 @@ def process_record(tasks_table, payload: dict) -> None:
 
     text, schema = _validate_extract_payload(payload)
 
-    # Keep a small simulated delay to preserve async behavior in smoke checks.
-    time.sleep(5)
-
-    result = _build_result(text, schema)
+    if os.getenv("BEDROCK_MODEL_ID"):
+        result = _invoke_bedrock_extract(text, schema)
+    else:
+        # Keep a small simulated delay to preserve async behavior in smoke checks.
+        time.sleep(5)
+        result = _build_result(text, schema)
     _store_completed_result(tasks_table, task_id, result)
 
     logger.info(

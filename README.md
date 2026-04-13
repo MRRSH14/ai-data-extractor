@@ -61,6 +61,8 @@ pip install -r requirements.txt
 npm install -g aws-cdk                              # if needed
 cdk bootstrap aws://ACCOUNT/REGION                  # once per account/region
 export DLQ_ALERT_EMAIL="ops@example.com"            # optional: SNS email for DLQ alarm
+export BEDROCK_MODEL_ID="anthropic.claude-3-haiku-20240307-v1:0"  # optional now, required for live Bedrock extraction
+export BEDROCK_REGION="us-east-1"                   # optional; defaults to stack region
 cdk deploy
 ```
 
