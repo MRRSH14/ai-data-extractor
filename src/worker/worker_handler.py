@@ -1,7 +1,5 @@
 import json
 import os
-import re
-import time
 from datetime import datetime, timezone
 
 import boto3  # type: ignore[reportMissingImports]
@@ -232,44 +230,6 @@ def _invoke_bedrock_extract(text: str, schema: dict) -> dict:
     return _coerce_and_validate_result(parsed, schema)
 
 
-def _extract_number(text: str) -> float:
-    match = re.search(r"-?\d+(?:\.\d+)?", text.replace(",", ""))
-    if not match:
-        return 0.0
-    return float(match.group(0))
-
-
-def _extract_boolean(text: str) -> bool:
-    lowered = text.lower()
-    truthy = ("yes", "true", "approved", "confirmed", "paid")
-    return any(token in lowered for token in truthy)
-
-
-def _build_result(text: str, schema: dict) -> dict:
-    """Deterministic fallback used when Bedrock isn't enabled."""
-    result: dict = {}
-    compact_text = " ".join(text.strip().split())
-    for field_name, descriptor in schema.items():
-        if not isinstance(field_name, str) or not field_name.strip():
-            raise NonRetryableProcessingError("schema field names must be non-empty strings")
-        if not isinstance(descriptor, dict):
-            raise NonRetryableProcessingError(
-                f'schema descriptor for "{field_name}" must be an object'
-            )
-        field_type = descriptor.get("type")
-        if field_type == "string":
-            result[field_name] = compact_text[:500]
-        elif field_type == "number":
-            result[field_name] = _extract_number(text)
-        elif field_type == "boolean":
-            result[field_name] = _extract_boolean(text)
-        else:
-            raise NonRetryableProcessingError(
-                f'schema type for "{field_name}" must be string, number, or boolean'
-            )
-    return result
-
-
 def _store_completed_result(tasks_table, task_id: str, result: dict) -> None:
     updated_at = datetime.now(timezone.utc).isoformat()
     tasks_table.update_item(
@@ -307,13 +267,7 @@ def process_record(tasks_table, payload: dict) -> None:
     update_task_status(tasks_table, task_id, "running")
 
     text, schema = _validate_extract_payload(payload)
-
-    if os.getenv("BEDROCK_MODEL_ID"):
-        result = _invoke_bedrock_extract(text, schema)
-    else:
-        # Keep a small simulated delay to preserve async behavior in smoke checks.
-        time.sleep(5)
-        result = _build_result(text, schema)
+    result = _invoke_bedrock_extract(text, schema)
     _store_completed_result(tasks_table, task_id, result)
 
     logger.info(

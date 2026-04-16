@@ -72,6 +72,16 @@ Stack outputs include **ApiUrl**, **TasksQueueUrl**, **DeadLetterQueueUrl**, **T
 
 **CI:** [`.github/workflows/cdk-deploy.yml`](.github/workflows/cdk-deploy.yml) runs on **workflow_dispatch**, assumes an AWS role via OIDC, sets `DLQ_ALERT_EMAIL` from **GitHub Actions secrets**, and runs `cdk deploy` from the `infra/` directory.
 
+### Required GitHub config
+
+For Actions-based deploys, configure repository secrets in GitHub:
+
+- `DLQ_ALERT_EMAIL` (optional, enables SNS email subscription for DLQ alarm)
+- `BEDROCK_MODEL_ID` (required for live Bedrock extraction path)
+- `BEDROCK_REGION` (recommended; defaults to stack region if omitted)
+
+Also ensure the AWS IAM role used by GitHub OIDC trust policy allows this repository (`MRRSH14/ai-data-extractor`) for workflow runs (for example, `repo:MRRSH14/ai-data-extractor:ref:refs/heads/main` and/or `repo:MRRSH14/ai-data-extractor:ref:refs/heads/*` depending on your policy).
+
 ## Local development assumptions
 
 - **Python 3.12** matches the Lambda runtime in CDK.

@@ -46,4 +46,6 @@ jobs:
       - name: Run CDK deploy
         env:
           DLQ_ALERT_EMAIL: ${{ secrets.DLQ_ALERT_EMAIL }}
+          BEDROCK_MODEL_ID: ${{ secrets.BEDROCK_MODEL_ID }}
+          BEDROCK_REGION: ${{ secrets.BEDROCK_REGION }}
         run: cdk deploy --require-approval never
