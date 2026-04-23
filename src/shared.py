@@ -4,6 +4,7 @@ import os
 import uuid
 import hashlib
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import boto3
 from botocore.exceptions import ClientError
@@ -68,10 +69,18 @@ IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60
 
 
 def json_response(status_code: int, payload: dict) -> dict:
+    def _json_default(value):
+        if isinstance(value, Decimal):
+            # Keep integers as ints; otherwise emit float for API clients/tests.
+            if value == value.to_integral_value():
+                return int(value)
+            return float(value)
+        raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
     return {
         "statusCode": status_code,
         "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(payload),
+        "body": json.dumps(payload, default=_json_default),
     }
 
 

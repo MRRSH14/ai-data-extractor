@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 
 import boto3  # type: ignore[reportMissingImports]
 from botocore.exceptions import ClientError  # type: ignore[reportMissingImports]
@@ -130,10 +131,12 @@ def _coerce_and_validate_result(raw_result: object, schema: dict) -> dict:
                 raise NonRetryableProcessingError(
                     f'field "{field_name}" must be a number, got boolean'
                 )
-            if not isinstance(value, (int, float)):
+            if isinstance(value, float):
+                value = Decimal(str(value))
+            elif not isinstance(value, (int, Decimal)):
                 try:
-                    value = float(str(value))
-                except (TypeError, ValueError):
+                    value = Decimal(str(value))
+                except (TypeError, ValueError, InvalidOperation):
                     raise NonRetryableProcessingError(
                         f'field "{field_name}" must be numeric'
                     ) from None
@@ -180,6 +183,55 @@ def _build_model_prompt(text: str, schema: dict) -> str:
     )
 
 
+def _extract_json_object_text(text: str) -> str:
+    candidate = text.strip()
+    if not candidate:
+        raise NonRetryableProcessingError("model output is empty")
+
+    # Common LLM pattern: ```json ... ```
+    if candidate.startswith("```"):
+        lines = candidate.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        candidate = "\n".join(lines).strip()
+
+    # Fast path when output is already a JSON object.
+    if candidate.startswith("{") and candidate.endswith("}"):
+        return candidate
+
+    # Fallback: find the first balanced JSON object inside mixed text.
+    start = candidate.find("{")
+    if start == -1:
+        raise NonRetryableProcessingError("model output does not contain a JSON object")
+
+    depth = 0
+    in_string = False
+    escaped = False
+    for idx in range(start, len(candidate)):
+        ch = candidate[idx]
+        if escaped:
+            escaped = False
+            continue
+        if ch == "\\":
+            escaped = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return candidate[start : idx + 1]
+
+    raise NonRetryableProcessingError("model output contains incomplete JSON object")
+
+
 def _invoke_bedrock_extract(text: str, schema: dict) -> dict:
     model_id = os.getenv("BEDROCK_MODEL_ID")
     if not model_id:
@@ -200,7 +252,25 @@ def _invoke_bedrock_extract(text: str, schema: dict) -> dict:
             accept="application/json",
             body=json.dumps(body),
         )
-    except ClientError:
+    except ClientError as exc:
+        error = exc.response.get("Error", {})
+        code = error.get("Code", "")
+        message = error.get("Message", "")
+        # Config/contract issue for some newer models (e.g., Claude Haiku 4.5):
+        # Bedrock may require invoking via inference profile instead of direct model ID.
+        if code == "ValidationException" and "inference profile" in message.lower():
+            raise NonRetryableProcessingError(
+                "BEDROCK_MODEL_ID must be an inference profile ID or ARN for this model"
+            ) from None
+        if code == "AccessDeniedException" and (
+            "aws-marketplace:subscribe" in message.lower()
+            or "aws-marketplace:viewsubscriptions" in message.lower()
+            or "marketplace subscription" in message.lower()
+        ):
+            raise NonRetryableProcessingError(
+                "Bedrock model access is not enabled for this account. "
+                "Grant AWS Marketplace permissions and subscribe/enable the model first."
+            ) from None
         logger.exception("Bedrock invoke failed", extra={"component": "worker", "event": "bedrock_error"})
         raise
 
@@ -221,7 +291,7 @@ def _invoke_bedrock_extract(text: str, schema: dict) -> dict:
         raise NonRetryableProcessingError("Bedrock text output is missing")
 
     try:
-        parsed = json.loads(text_output)
+        parsed = json.loads(_extract_json_object_text(text_output))
     except json.JSONDecodeError as exc:
         raise NonRetryableProcessingError(
             f"model output is not valid JSON: {exc.msg}"

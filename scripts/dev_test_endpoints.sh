@@ -61,6 +61,28 @@ assert_status() {
 
 echo "Running endpoint checks against: $API_URL"
 
+run_nonce="$(date +%s)-$$-$RANDOM"
+extract_text="Invoice 100 total 42.5 paid run-${run_nonce}"
+extract_payload="$(
+  python3 - <<'PY' "$extract_text"
+import json,sys
+text = sys.argv[1]
+payload = {
+    "job_type": "extract",
+    "input": {
+        "mode": "text",
+        "text": text,
+        "schema": {
+            "invoice_id": {"type": "string"},
+            "amount": {"type": "number"},
+            "is_paid": {"type": "boolean"},
+        },
+    },
+}
+print(json.dumps(payload, separators=(",", ":")))
+PY
+)"
+
 # 1) Public health
 read -r code resp < <(http_status GET "$API_URL/health")
 assert_status "GET /health public" "$code" "200"
@@ -70,7 +92,7 @@ read -r code resp < <(http_status GET "$API_URL/hello?name=dev")
 assert_status "GET /hello public" "$code" "200"
 
 # 3) Protected create without token should fail
-read -r code resp < <(http_status POST "$API_URL/tasks" "" '{"job_type":"extract","input":{"mode":"text","text":"Invoice 100 total 42.5 paid","schema":{"invoice_id":{"type":"string"},"amount":{"type":"number"},"is_paid":{"type":"boolean"}}}}')
+read -r code resp < <(http_status POST "$API_URL/tasks" "" "$extract_payload")
 if [[ "$code" != "401" && "$code" != "403" ]]; then
   echo "[FAIL] POST /tasks without token expected 401/403 got $code"
   exit 1
@@ -78,7 +100,6 @@ fi
 echo "[PASS] POST /tasks requires token ($code)"
 
 # 4) Protected create with test token should pass
-extract_payload='{"job_type":"extract","input":{"mode":"text","text":"Invoice 100 total 42.5 paid","schema":{"invoice_id":{"type":"string"},"amount":{"type":"number"},"is_paid":{"type":"boolean"}}}}'
 read -r code resp < <(http_status POST "$API_URL/tasks" "$TEST_ID_TOKEN" "$extract_payload")
 assert_status "POST /tasks with test token" "$code" "202"
 

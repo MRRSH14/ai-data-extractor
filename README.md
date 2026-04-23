@@ -66,7 +66,7 @@ export BEDROCK_REGION="us-east-1"                   # optional; defaults to stac
 cdk deploy
 ```
 
-When `BEDROCK_MODEL_ID` is set at deploy time, CDK scopes worker IAM `bedrock:InvokeModel` permission to that specific model ARN.
+For MVP reliability, worker IAM currently allows `bedrock:InvokeModel` on `*`. After model/access setup stabilizes, tighten this to specific model/profile ARNs.
 
 Stack outputs include **ApiUrl**, **TasksQueueUrl**, **DeadLetterQueueUrl**, **TasksUserPoolId**, **TasksUserPoolClientId**, and related ARNs.
 
@@ -77,7 +77,7 @@ Stack outputs include **ApiUrl**, **TasksQueueUrl**, **DeadLetterQueueUrl**, **T
 For Actions-based deploys, configure repository secrets in GitHub:
 
 - `DLQ_ALERT_EMAIL` (optional, enables SNS email subscription for DLQ alarm)
-- `BEDROCK_MODEL_ID` (required for live Bedrock extraction path)
+- `BEDROCK_MODEL_ID` (required for live Bedrock extraction path; for some newer models, use an inference profile ID/ARN instead of direct foundation model ID)
 - `BEDROCK_REGION` (recommended; defaults to stack region if omitted)
 
 Also ensure the AWS IAM role used by GitHub OIDC trust policy allows this repository (`MRRSH14/ai-data-extractor`) for workflow runs (for example, `repo:MRRSH14/ai-data-extractor:ref:refs/heads/main` and/or `repo:MRRSH14/ai-data-extractor:ref:refs/heads/*` depending on your policy).
