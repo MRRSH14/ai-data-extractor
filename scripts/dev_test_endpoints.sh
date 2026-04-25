@@ -200,6 +200,14 @@ result = payload.get("result")
 if not isinstance(result, dict):
     print("[FAIL] Expected result object on completed task")
     sys.exit(1)
+metadata = payload.get("result_metadata")
+if not isinstance(metadata, dict):
+    print("[FAIL] Expected result_metadata object on completed task")
+    sys.exit(1)
+for key in ("provider", "model_id", "processed_at"):
+    if key not in metadata:
+        print(f"[FAIL] Missing expected result_metadata key: {key}")
+        sys.exit(1)
 for key in ("invoice_id", "amount", "is_paid"):
     if key not in result:
         print(f"[FAIL] Missing expected result key: {key}")
@@ -266,6 +274,10 @@ if status != "completed":
 result = payload.get("result")
 if not isinstance(result, dict):
     print("[FAIL] Expected result object on completed second scenario task")
+    sys.exit(1)
+metadata = payload.get("result_metadata")
+if not isinstance(metadata, dict):
+    print("[FAIL] Expected result_metadata object on completed second scenario task")
     sys.exit(1)
 for key in ("po_number", "vendor_name", "item_count", "has_late_fee"):
     if key not in result:

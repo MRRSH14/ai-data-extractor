@@ -50,7 +50,7 @@ Supporting pieces (not shown in detail above):
    The Lambda handler dispatches on path and method (`src/service/api_handler.py`): `/health`, `/hello`, `POST /tasks`, `GET /tasks/{id}`.
 
 3. **Task creation (`POST /tasks`)**  
-   - Validates JSON body (`job_type`, `input` required).  
+   - Validates JSON body (`job_type="extract"`, `input.mode="text"`, `input.text`, and schema descriptor rules including `required` and `enum` constraints).  
    - Writes a new item to DynamoDB, then sends a JSON message to the tasks queue, then updates status to **queued** (see [Task state](#task-state-transitions)).  
    - Returns **202 Accepted** with the task payload including current status.
 
@@ -65,7 +65,7 @@ Task routes now require JWT authentication at API Gateway. API handlers also enf
    The worker is triggered by the tasks queue (`SqsEventSource`, batch size 1).
 
 2. **Processing**  
-   The worker parses `task_id` from the message body, sets status to **running**, performs work (today a simulated delay), then sets **completed** on success.
+   The worker parses the payload, sets status to **running**, invokes Bedrock for extraction, validates/coerces output against schema constraints (`type`, `required`, `enum`), then sets **completed** on success and stores `result` plus `result_metadata`.
 
 3. **Failures**  
    - **Validation / bad message** (`ValueError`): task is marked **failed** with an error message; the invocation does not rethrow, so SQS treats the message as successfully processed and deletes it.  
@@ -121,7 +121,7 @@ The sprint roadmap used names like `pending`; in code, the pre-queue state is **
 
 - **Tenant migration caveat:** Older task rows created before tenant-aware writes may not have `tenant_id`; those records may be inaccessible under strict tenant checks until migrated.
 - **No automatic DLQ processing:** Poison or stuck messages require manual or scripted handling.
-- **Worker is a stub:** Processing is a sleep; there is no real AI or external integration yet.
+- **Bedrock-dependent processing:** Successful extraction depends on model access/subscription, IAM configuration, and model output quality (worker handles structured/non-retryable failure paths).
 - **Single table, string PK:** `task_id` only; no GSIs for listing by user or tenant.
 - **Alert noise tradeoff:** DLQ alarm is tuned to page quickly (including single-message incidents), which can be noisier than backlog-only alerting; see the runbook.
 
@@ -155,7 +155,7 @@ Practical sequence for this product:
 These are candidate capabilities to grow from extraction MVP to a more complete platform.
 
 - **File ingestion mode:** support S3 pointers/presigned upload flows, with optional Textract for scanned documents.
-- **Schema richness:** nested objects/arrays, enums, stronger type constraints, and reusable schema templates.
+- **Schema richness (next):** nested objects/arrays and reusable schema templates. (Top-level `required` and `enum` are now implemented.)
 - **Quality controls:** confidence scoring, field-level provenance snippets, and configurable validation strictness.
 - **Human review loop:** optional review queue for low-confidence outputs before downstream commit.
 - **Result storage strategy:** large output artifacts in S3 with DynamoDB metadata pointers and lifecycle policies.

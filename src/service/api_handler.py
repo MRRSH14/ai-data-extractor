@@ -90,6 +90,32 @@ def _validate_extract_input(input_value: object, *, correlation_id: str) -> dict
                 f'input.schema["{field_name}"].required must be a boolean when provided',
             )
 
+        enum = descriptor.get("enum")
+        if enum is not None:
+            if not isinstance(enum, list) or not enum:
+                return _validation_error(
+                    correlation_id,
+                    f'input.schema["{field_name}"].enum must be a non-empty array when provided',
+                )
+            if field_type == "string":
+                if not all(isinstance(v, str) for v in enum):
+                    return _validation_error(
+                        correlation_id,
+                        f'input.schema["{field_name}"].enum must contain only strings',
+                    )
+            elif field_type == "number":
+                if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in enum):
+                    return _validation_error(
+                        correlation_id,
+                        f'input.schema["{field_name}"].enum must contain only numbers',
+                    )
+            elif field_type == "boolean":
+                if not all(isinstance(v, bool) for v in enum):
+                    return _validation_error(
+                        correlation_id,
+                        f'input.schema["{field_name}"].enum must contain only booleans',
+                    )
+
     return None
 
 

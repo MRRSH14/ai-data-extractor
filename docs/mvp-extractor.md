@@ -12,9 +12,9 @@ A caller submits a task with `job_type=extract` and provides:
 
 For MVP, file paths, S3 pointers, and uploaded files are out of scope for execution input. Those are planned as a later mode.
 
-For the current MVP implementation, the worker uses a deterministic extraction stub (no live model call yet), validates payload/schema shape, and persists the result. The caller polls `GET /tasks/{id}` until status is `completed` or `failed`.
+For the current MVP implementation, the worker invokes Claude through Amazon Bedrock, validates payload/schema shape, and persists the result. The caller polls `GET /tasks/{id}` until status is `completed` or `failed`.
 
-**LLM backend (next increment):** Claude via Amazon Bedrock (`bedrock-runtime`). Auth is IAM — no API keys. The worker Lambda will need an `bedrock:InvokeModel` grant on the target model ARN (added to CDK when Bedrock integration is enabled). No third-party SDK bundling required; `boto3` covers the Bedrock client.
+**LLM backend (current):** Claude via Amazon Bedrock (`bedrock-runtime`). Auth is IAM (no API keys). Worker IAM grants `bedrock:InvokeModel` on scoped resources derived from `BEDROCK_MODEL_ID` (including compatibility ARN variants used by inference-profile-backed invokes). No third-party SDK bundling is required; `boto3` covers the Bedrock client.
 
 ---
 
@@ -53,7 +53,8 @@ For the current MVP implementation, the worker uses a deterministic extraction s
 | `input.schema` | object | yes | 1 – 20 top-level keys; each key is a field descriptor |
 | `input.schema[field].type` | string | yes | One of `"string"`, `"number"`, `"boolean"` |
 | `input.schema[field].description` | string | no | Plain-language hint sent to the LLM |
-| `input.schema[field].required` | boolean | no | Default `false`; if `true` and LLM omits it → task fails |
+| `input.schema[field].required` | boolean | no | Default `false`; if `true` and model omits it -> task fails |
+| `input.schema[field].enum` | array | no | Non-empty list of allowed values; element type must match `type` |
 
 **Example:**
 
@@ -111,6 +112,11 @@ For the current MVP implementation, the worker uses a deterministic extraction s
     "total_amount": 1250.00,
     "vendor_name": "Acme Corp"
   },
+  "result_metadata": {
+    "provider": "bedrock",
+    "model_id": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "processed_at": "2024-03-15T10:00:05Z"
+  },
   "tenant_id": "acme",
   "created_by": "<sub>",
   "created_at": "2024-03-15T10:00:00Z",
@@ -144,6 +150,7 @@ queued → running → completed
 ```
 
 `result` is only present when `status == "completed"`.
+`result_metadata` is only present when `status == "completed"`.
 `error_message` is present when `status == "failed"` or `"retrying"`.
 
 ---
@@ -156,6 +163,7 @@ queued → running → completed
 | `schema` missing or empty | API returns **400** | No | Rejected at API layer |
 | Unknown `mode` value | API returns **400** | No | Only `"text"` supported in MVP |
 | Required schema field absent in extraction output | `failed` | No | Non-retryable contract/validation issue |
+| Extracted value violates enum constraint | `failed` | No | Non-retryable contract/validation issue |
 | Worker payload/schema validation fails | `failed` | No | Non-retryable malformed input path |
 | Bedrock timeout / network error | `retrying` | Yes | SQS retries up to `maxReceiveCount`; then DLQ |
 | Bedrock throttling (`ThrottlingException`) | `retrying` | Yes | Same retry path |
@@ -178,6 +186,7 @@ The worker distinguishes failures before raising:
 2. `input.text` must be a non-empty string ≤ 32 768 characters.
 3. `input.schema` must be a non-empty object with ≤ 20 keys.
 4. Each schema field descriptor must have a valid `type` (`"string"`, `"number"`, `"boolean"`).
+5. If `enum` is provided, it must be a non-empty array with element types matching descriptor `type`.
 
 These return **400** with a descriptive `error` string.
 
@@ -186,7 +195,7 @@ These return **400** with a descriptive `error` string.
 ## Out of scope for MVP
 
 - File pointer input (S3 key / presigned URL) — tracked as next mode.
-- Nested or array types in the extraction schema.
+- Nested object/array schema types in extraction result contract.
 - Per-field confidence scores.
 - Streaming results.
 - Client-provided idempotency keys.

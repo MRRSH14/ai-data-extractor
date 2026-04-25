@@ -75,3 +75,33 @@ def test_coerce_and_validate_result_rejects_invalid_boolean_text() -> None:
 
     with pytest.raises(NonRetryableProcessingError, match="must be boolean"):
         _coerce_and_validate_result(raw, schema)
+
+
+def test_coerce_and_validate_result_enforces_required_field() -> None:
+    schema = {"invoice_id": {"type": "string", "required": True}}
+    raw = {}
+
+    with pytest.raises(NonRetryableProcessingError, match='required field "invoice_id" missing'):
+        _coerce_and_validate_result(raw, schema)
+
+
+def test_coerce_and_validate_result_enforces_string_enum() -> None:
+    schema = {"status": {"type": "string", "enum": ["paid", "unpaid"]}}
+    raw = {"status": "paid"}
+    normalized = _coerce_and_validate_result(raw, schema)
+    assert normalized["status"] == "paid"
+
+
+def test_coerce_and_validate_result_rejects_string_enum_miss() -> None:
+    schema = {"status": {"type": "string", "enum": ["paid", "unpaid"]}}
+    raw = {"status": "pending"}
+
+    with pytest.raises(NonRetryableProcessingError, match='field "status" must be one of'):
+        _coerce_and_validate_result(raw, schema)
+
+
+def test_coerce_and_validate_result_enforces_number_enum_after_coercion() -> None:
+    schema = {"amount": {"type": "number", "enum": [10, 42.5]}}
+    raw = {"amount": "42.5"}
+    normalized = _coerce_and_validate_result(raw, schema)
+    assert normalized["amount"] == Decimal("42.5")

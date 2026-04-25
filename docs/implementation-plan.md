@@ -12,11 +12,19 @@ This repository is now productized from the `platform-v1` baseline. Treat the ex
 
 ### Near-term milestones (extractor MVP)
 
-- [ ] Define extraction API contract (`job_type="extract"`), text-first input shape (`input.mode="text"`), schema payload, and limits.
-- [ ] Implement worker extraction path for one supported input type (text first, then file pointer).
-- [ ] Validate model output against requested schema and persist deterministic result/status.
-- [ ] Add retrieval shape for extraction result and clear failure/error semantics (`failed` for deterministic malformed payload/output, `retrying` for transient processing failures).
-- [ ] Add runbook/test flow for extraction success, malformed input, and retry/DLQ behavior.
+- [x] Define extraction API contract (`job_type="extract"`), text-first input shape (`input.mode="text"`), schema payload, and limits.
+- [x] Implement worker extraction path for one supported input type (text first, then file pointer).
+- [x] Validate model output against requested schema and persist deterministic result/status.
+- [x] Add retrieval shape for extraction result and clear failure/error semantics (`failed` for deterministic malformed payload/output, `retrying` for transient processing failures).
+- [x] Add runbook/test flow for extraction success, malformed input, and retry/DLQ behavior.
+
+Recent completion notes:
+
+- Worker now uses Bedrock extraction path with robust JSON parsing and schema validation.
+- Schema constraints now enforce `required` and `enum` (API validation + worker runtime enforcement).
+- Completed-task contract includes `result_metadata` (`provider`, `model_id`, `processed_at`).
+- Smoke coverage includes two extractor scenarios and cross-tenant denial.
+- Unit tests added for parser/coercion helpers in `src/tests/unit/test_worker_handler_helpers.py`.
 
 ---
 

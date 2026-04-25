@@ -66,7 +66,7 @@ export BEDROCK_REGION="us-east-1"                   # optional; defaults to stac
 cdk deploy
 ```
 
-For MVP reliability, worker IAM currently allows `bedrock:InvokeModel` on `*`. After model/access setup stabilizes, tighten this to specific model/profile ARNs.
+Worker IAM scopes `bedrock:InvokeModel` to resource ARNs derived from `BEDROCK_MODEL_ID` (foundation model ID, inference profile ID, or full ARN). The policy includes Bedrock compatibility variants needed for inference-profile-backed invokes.
 
 Stack outputs include **ApiUrl**, **TasksQueueUrl**, **DeadLetterQueueUrl**, **TasksUserPoolId**, **TasksUserPoolClientId**, and related ARNs.
 
@@ -118,7 +118,7 @@ What it does:
   - `test_user@example.com` -> `test_tenant`
   - `demo_user@example.com` -> `demo_tenant`
 - logs in both users and obtains JWTs;
-- runs `scripts/dev_test_endpoints.sh` endpoint checks (public routes, protected routes, and cross-tenant denial).
+- runs `scripts/dev_test_endpoints.sh` endpoint checks (public routes, protected routes, two extraction scenarios, and cross-tenant denial).
 
 Prerequisites:
 
@@ -129,6 +129,12 @@ You can run endpoint tests directly if you already have tokens:
 ```bash
 API_URL="..." TEST_ID_TOKEN="..." DEMO_ID_TOKEN="..." ./scripts/dev_test_endpoints.sh
 ```
+
+Smoke checks now validate:
+
+- extractor scenario #1 (`invoice_id`, `amount`, `is_paid`)
+- extractor scenario #2 (`po_number`, `vendor_name`, `item_count`, `has_late_fee`)
+- `result_metadata` presence on completed tasks (`provider`, `model_id`, `processed_at`)
 
 ### Tenant onboarding acceptance check
 
@@ -143,6 +149,14 @@ Use this quick check after onboarding a user to confirm tenant isolation still w
 - `POST /tasks` computes a deterministic hash from caller/task inputs (`tenant_id`, `created_by`, `job_type`, canonicalized `input`) and uses that as an internal idempotency key.
 - Idempotency records live in a dedicated DynamoDB table (`TaskIdempotencyTable`) with TTL (`expires_at`) set to **1 week**.
 - First request creates/enqueues task as normal; same logical retry returns the existing task (no duplicate enqueue).
+
+### Schema constraints (MVP now enforced)
+
+For each schema field descriptor:
+
+- `type`: one of `string`, `number`, `boolean`
+- `required` (optional): boolean; missing required output field causes terminal `failed`
+- `enum` (optional): non-empty array of allowed values; API validates enum element types against `type`, and worker enforces the constraint after normalization/coercion
 
 ## Roadmap summary
 

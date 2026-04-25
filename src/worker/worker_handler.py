@@ -115,6 +115,7 @@ def _coerce_and_validate_result(raw_result: object, schema: dict) -> dict:
 
         field_type = descriptor.get("type")
         required = bool(descriptor.get("required", False))
+        enum_values = descriptor.get("enum")
         value = raw_result.get(field_name)
         if value is None:
             if required:
@@ -159,6 +160,44 @@ def _coerce_and_validate_result(raw_result: object, schema: dict) -> dict:
             raise NonRetryableProcessingError(
                 f'schema type for "{field_name}" must be string, number, or boolean'
             )
+
+        if enum_values is not None:
+            if not isinstance(enum_values, list) or not enum_values:
+                raise NonRetryableProcessingError(
+                    f'schema enum for "{field_name}" must be a non-empty array'
+                )
+            if field_type == "number":
+                try:
+                    normalized_value = (
+                        value if isinstance(value, Decimal) else Decimal(str(value))
+                    )
+                    normalized_enum = [Decimal(str(v)) for v in enum_values]
+                except (TypeError, ValueError, InvalidOperation):
+                    raise NonRetryableProcessingError(
+                        f'schema enum for "{field_name}" must contain numeric values'
+                    ) from None
+                if normalized_value not in normalized_enum:
+                    raise NonRetryableProcessingError(
+                        f'field "{field_name}" must be one of {enum_values}'
+                    )
+            elif field_type == "string":
+                if not all(isinstance(v, str) for v in enum_values):
+                    raise NonRetryableProcessingError(
+                        f'schema enum for "{field_name}" must contain string values'
+                    )
+                if value not in enum_values:
+                    raise NonRetryableProcessingError(
+                        f'field "{field_name}" must be one of {enum_values}'
+                    )
+            else:  # boolean
+                if not all(isinstance(v, bool) for v in enum_values):
+                    raise NonRetryableProcessingError(
+                        f'schema enum for "{field_name}" must contain boolean values'
+                    )
+                if value not in enum_values:
+                    raise NonRetryableProcessingError(
+                        f'field "{field_name}" must be one of {enum_values}'
+                    )
 
         normalized[field_name] = value
 
@@ -302,21 +341,29 @@ def _invoke_bedrock_extract(text: str, schema: dict) -> dict:
 
 def _store_completed_result(tasks_table, task_id: str, result: dict) -> None:
     updated_at = datetime.now(timezone.utc).isoformat()
+    model_id = os.getenv("BEDROCK_MODEL_ID", "")
+    metadata = {
+        "provider": "bedrock",
+        "model_id": model_id,
+        "processed_at": updated_at,
+    }
     tasks_table.update_item(
         Key={"task_id": task_id},
         UpdateExpression=(
             "SET #status = :status, updated_at = :updated_at, "
-            "#result = :result REMOVE #err"
+            "#result = :result, #meta = :meta REMOVE #err"
         ),
         ExpressionAttributeNames={
             "#status": "status",
             "#result": "result",
+            "#meta": "result_metadata",
             "#err": "error_message",
         },
         ExpressionAttributeValues={
             ":status": "completed",
             ":updated_at": updated_at,
             ":result": result,
+            ":meta": metadata,
         },
     )
 
