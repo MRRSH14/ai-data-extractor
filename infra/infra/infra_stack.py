@@ -21,6 +21,40 @@ from aws_cdk.aws_sns import Topic as SnsTopic
 from typing import cast
 import os
 
+
+def _bedrock_invoke_resources(model_id: str, region: str, account: str) -> list[str]:
+    model_id = model_id.strip()
+    if not model_id:
+        return ["*"]
+
+    # Full ARN provided.
+    if model_id.startswith("arn:aws:bedrock:"):
+        resources = [model_id]
+        # Inference profiles can trigger checks against backing foundation model.
+        if ":inference-profile/" in model_id:
+            profile_id = model_id.rsplit("/", 1)[-1]
+            foundation_id = profile_id[len("global.") :] if profile_id.startswith("global.") else profile_id
+            resources.append(f"arn:aws:bedrock:{region}::foundation-model/{foundation_id}")
+            resources.append(f"arn:aws:bedrock:::foundation-model/{foundation_id}")
+        return resources
+
+    # Short inference profile ID, e.g. global.anthropic...
+    if model_id.startswith("global."):
+        foundation_id = model_id[len("global.") :]
+        return [
+            f"arn:aws:bedrock:{region}:{account}:inference-profile/{model_id}",
+            f"arn:aws:bedrock:{region}::inference-profile/{model_id}",
+            f"arn:aws:bedrock:{region}::foundation-model/{foundation_id}",
+            f"arn:aws:bedrock:::foundation-model/{foundation_id}",
+        ]
+
+    # Foundation model ID.
+    return [
+        f"arn:aws:bedrock:{region}::foundation-model/{model_id}",
+        f"arn:aws:bedrock:::foundation-model/{model_id}",
+    ]
+
+
 class InfraStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
@@ -163,12 +197,17 @@ class InfraStack(Stack):
 
         tasks_queue.grant_consume_messages(worker_lambda)
         tasks_table.grant_read_write_data(worker_lambda)
+        bedrock_model_id = os.getenv("BEDROCK_MODEL_ID", "")
+        bedrock_region = os.getenv("BEDROCK_REGION", "").strip() or self.region
+        bedrock_resources = _bedrock_invoke_resources(
+            model_id=bedrock_model_id,
+            region=bedrock_region,
+            account=self.account,
+        )
         worker_lambda.add_to_role_policy(
             iam.PolicyStatement(
                 actions=["bedrock:InvokeModel"],
-                # MVP simplicity: allow invoke for any Bedrock model/profile.
-                # Tighten this to model-specific ARNs after workflow stabilizes.
-                resources=["*"],
+                resources=bedrock_resources,
             )
         )
         # Some Bedrock models require AWS Marketplace entitlement checks on first use.

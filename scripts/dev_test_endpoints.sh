@@ -83,6 +83,28 @@ print(json.dumps(payload, separators=(",", ":")))
 PY
 )"
 
+extract_text_v2="PO-7781 vendor ACME due 2026-05-30 late fee no items 3 run-${run_nonce}"
+extract_payload_v2="$(
+  python3 - <<'PY' "$extract_text_v2"
+import json,sys
+text = sys.argv[1]
+payload = {
+    "job_type": "extract",
+    "input": {
+        "mode": "text",
+        "text": text,
+        "schema": {
+            "po_number": {"type": "string"},
+            "vendor_name": {"type": "string"},
+            "item_count": {"type": "number"},
+            "has_late_fee": {"type": "boolean"},
+        },
+    },
+}
+print(json.dumps(payload, separators=(",", ":")))
+PY
+)"
+
 # 1) Public health
 read -r code resp < <(http_status GET "$API_URL/health")
 assert_status "GET /health public" "$code" "200"
@@ -191,7 +213,74 @@ if not isinstance(result.get("is_paid"), bool):
 print("[PASS] Extractor task completed with expected result shape")
 PY
 
-# 6) Optional cross-tenant check
+# 6) Second extraction scenario with different schema
+read -r code resp < <(http_status POST "$API_URL/tasks" "$TEST_ID_TOKEN" "$extract_payload_v2")
+assert_status "POST /tasks second extractor scenario" "$code" "202"
+
+task_id_v2="$(
+  python3 - <<'PY' "$resp"
+import json,sys
+payload = json.loads(sys.argv[1])
+print(payload.get("task_id",""))
+PY
+)"
+
+if [[ -z "$task_id_v2" ]]; then
+  echo "[FAIL] Could not parse task_id from second create response"
+  exit 1
+fi
+echo "[INFO] Created second task_id=$task_id_v2"
+
+poll_attempt=1
+last_resp_v2=""
+while [[ "$poll_attempt" -le "$max_attempts" ]]; do
+  read -r code resp < <(http_status GET "$API_URL/tasks/$task_id_v2" "$TEST_ID_TOKEN")
+  assert_status "GET /tasks/{id} second scenario (attempt $poll_attempt)" "$code" "200"
+  status="$(
+    python3 - <<'PY' "$resp"
+import json,sys
+payload = json.loads(sys.argv[1])
+print(payload.get("status",""))
+PY
+  )"
+  last_resp_v2="$resp"
+  if [[ "$status" == "completed" || "$status" == "failed" ]]; then
+    break
+  fi
+  sleep 1
+  poll_attempt=$((poll_attempt + 1))
+done
+
+if [[ -z "$last_resp_v2" ]]; then
+  echo "[FAIL] Empty second task response while polling"
+  exit 1
+fi
+
+python3 - <<'PY' "$last_resp_v2"
+import json,sys
+payload = json.loads(sys.argv[1])
+status = payload.get("status")
+if status != "completed":
+    print(f"[FAIL] Expected completed status for second scenario, got {status!r}")
+    sys.exit(1)
+result = payload.get("result")
+if not isinstance(result, dict):
+    print("[FAIL] Expected result object on completed second scenario task")
+    sys.exit(1)
+for key in ("po_number", "vendor_name", "item_count", "has_late_fee"):
+    if key not in result:
+        print(f"[FAIL] Missing expected second-scenario result key: {key}")
+        sys.exit(1)
+if not isinstance(result.get("item_count"), (int, float)):
+    print("[FAIL] second scenario result.item_count must be numeric")
+    sys.exit(1)
+if not isinstance(result.get("has_late_fee"), bool):
+    print("[FAIL] second scenario result.has_late_fee must be boolean")
+    sys.exit(1)
+print("[PASS] Second extractor scenario completed with expected result shape")
+PY
+
+# 7) Optional cross-tenant check
 if [[ -n "${DEMO_ID_TOKEN:-}" ]]; then
   read -r code resp < <(http_status GET "$API_URL/tasks/$task_id" "$DEMO_ID_TOKEN")
   assert_status "GET /tasks/{id} cross-tenant denied" "$code" "403"
