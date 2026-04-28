@@ -3,18 +3,16 @@ from datetime import datetime, timezone
 
 from shared import logger, get_tasks_table, update_task_status
 from worker.bedrock_extract import (
-    _extract_json_object_text,
-    _invoke_bedrock_extract,
+    invoke_bedrock_extract,
 )
 from worker.errors import (
     NonRetryableProcessingError,
     retryable_error_message as _retryable_error_message,
 )
-from worker.parsing import parse_task_id_from_record, parse_task_payload
-from worker.quality import _build_quality_metadata
+from worker.parsing import parse_task_payload
+from worker.quality import build_quality_metadata
 from worker.validation import (
-    _coerce_and_validate_result,
-    _validate_extract_payload,
+    validate_extract_payload,
 )
 
 
@@ -45,7 +43,7 @@ def _store_completed_result(tasks_table, task_id: str, result: dict, schema: dic
         "provider": "bedrock",
         "model_id": model_id,
         "processed_at": updated_at,
-        "quality": _build_quality_metadata(schema, result),
+        "quality": build_quality_metadata(schema, result),
     }
     tasks_table.update_item(
         Key={"task_id": task_id},
@@ -83,8 +81,8 @@ def process_record(tasks_table, payload: dict) -> None:
 
     update_task_status(tasks_table, task_id, "running")
 
-    text, schema = _validate_extract_payload(payload)
-    result = _invoke_bedrock_extract(text, schema)
+    text, schema = validate_extract_payload(payload)
+    result = invoke_bedrock_extract(text, schema)
     _store_completed_result(tasks_table, task_id, result, schema)
 
     logger.info(

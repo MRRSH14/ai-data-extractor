@@ -25,8 +25,9 @@ Recent completion notes:
 - Completed-task contract includes `result_metadata` (`provider`, `model_id`, `processed_at`).
 - Completed-task metadata now includes task-level quality metrics (`coverage`, `required_coverage`, `field_presence`).
 - Smoke coverage includes two extractor scenarios and cross-tenant denial.
-- Unit tests added for parser/coercion helpers in `src/tests/unit/test_worker_handler_helpers.py`.
+- Unit tests added for worker helper modules in `src/tests/unit/test_worker_validation.py`, `src/tests/unit/test_worker_bedrock_extract_helpers.py`, and `src/tests/unit/test_worker_quality.py`.
 - Operator-facing error taxonomy is now standardized in API/worker responses (`error_code` for API 400s and coded `error_message` prefixes in worker failures).
+- API/worker refactor completed into focused modules with expanded unit coverage; API router now lazily initializes task dependencies so public routes remain available without queue env setup.
 
 ---
 

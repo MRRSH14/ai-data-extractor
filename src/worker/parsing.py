@@ -39,8 +39,3 @@ def parse_task_payload(record: dict) -> dict:
         "job_type": message.get("job_type"),
         "input": message.get("input"),
     }
-
-
-def parse_task_id_from_record(record: dict) -> str:
-    """Backward-compatible: task id only (used in error paths)."""
-    return parse_task_payload(record)["task_id"]

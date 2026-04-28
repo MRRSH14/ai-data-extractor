@@ -144,7 +144,3 @@ def invoke_bedrock_extract(text: str, schema: dict) -> dict:
 
     return coerce_and_validate_result(parsed, schema)
 
-
-# Backward-compatible aliases for existing imports/tests
-_extract_json_object_text = extract_json_object_text
-_invoke_bedrock_extract = invoke_bedrock_extract

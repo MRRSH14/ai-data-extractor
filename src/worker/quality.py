@@ -32,6 +32,3 @@ def build_quality_metadata(schema: dict, result: dict) -> dict:
         "field_presence": field_presence,
     }
 
-
-# Backward-compatible alias for existing imports/tests
-_build_quality_metadata = build_quality_metadata

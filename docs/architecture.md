@@ -49,6 +49,8 @@ Supporting pieces (not shown in detail above):
 2. **Routing**  
    The Lambda handler dispatches on path and method (`src/service/api_handler.py`): `/health`, `/hello`, `POST /tasks`, `GET /tasks/{id}`.
 
+   Public routes (`/health`, `/hello`) do not require task queue/table environment setup. Task-specific dependencies are loaded only for `/tasks` routes.
+
 3. **Task creation (`POST /tasks`)**  
    - Validates JSON body (`job_type="extract"`, `input.mode="text"`, `input.text`, and schema descriptor rules including `required`, `enum`, `min_length`/`max_length`, and `minimum`/`maximum`).  
    - Writes a new item to DynamoDB, then sends a JSON message to the tasks queue, then updates status to **queued** (see [Task state](#task-state-transitions)).  
@@ -155,7 +157,6 @@ Practical sequence for this product:
 These are candidate capabilities to grow from extraction MVP to a more complete platform.
 
 - **File ingestion mode:** support S3 pointers/presigned upload flows, with optional Textract for scanned documents.
-- **Schema richness (next):** nested objects/arrays and reusable schema templates. (Top-level `required` and `enum` are now implemented.)
 - **Schema richness (next):** nested objects/arrays and reusable schema templates. (Top-level `required`, `enum`, range, and string length constraints are now implemented.)
 - **Quality controls:** confidence scoring, field-level provenance snippets, and configurable validation strictness.
 - **Human review loop:** optional review queue for low-confidence outputs before downstream commit.

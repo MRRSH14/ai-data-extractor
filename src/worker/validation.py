@@ -192,7 +192,3 @@ def coerce_and_validate_result(raw_result: object, schema: dict) -> dict:
 
     return normalized
 
-
-# Backward-compatible aliases for existing imports/tests
-_validate_extract_payload = validate_extract_payload
-_coerce_and_validate_result = coerce_and_validate_result
