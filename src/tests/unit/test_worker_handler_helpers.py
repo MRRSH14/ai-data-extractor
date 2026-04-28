@@ -11,6 +11,7 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
 
 from worker.worker_handler import (
     NonRetryableProcessingError,
+    _build_quality_metadata,
     _coerce_and_validate_result,
     _extract_json_object_text,
 )
@@ -133,3 +134,33 @@ def test_coerce_and_validate_result_rejects_number_below_minimum() -> None:
     raw = {"score": 5}
     with pytest.raises(NonRetryableProcessingError, match=r"SCHEMA_VALIDATION.*must be >= 10"):
         _coerce_and_validate_result(raw, schema)
+
+
+def test_build_quality_metadata_reports_coverage_and_field_presence() -> None:
+    schema = {
+        "invoice_id": {"type": "string", "required": True},
+        "amount": {"type": "number", "required": True},
+        "vendor_name": {"type": "string"},
+    }
+    result = {
+        "invoice_id": "INV-42",
+        "amount": Decimal("10.5"),
+    }
+
+    quality = _build_quality_metadata(schema, result)
+
+    assert quality["coverage"] == {
+        "schema_fields_total": 3,
+        "schema_fields_extracted": 2,
+        "ratio": 0.6667,
+    }
+    assert quality["required_coverage"] == {
+        "required_fields_total": 2,
+        "required_fields_extracted": 2,
+        "ratio": 1.0,
+    }
+    assert quality["field_presence"] == {
+        "invoice_id": True,
+        "amount": True,
+        "vendor_name": False,
+    }

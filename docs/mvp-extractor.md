@@ -119,7 +119,25 @@ For the current MVP implementation, the worker invokes Claude through Amazon Bed
   "result_metadata": {
     "provider": "bedrock",
     "model_id": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0",
-    "processed_at": "2024-03-15T10:00:05Z"
+    "processed_at": "2024-03-15T10:00:05Z",
+    "quality": {
+      "coverage": {
+        "schema_fields_total": 4,
+        "schema_fields_extracted": 4,
+        "ratio": 1.0
+      },
+      "required_coverage": {
+        "required_fields_total": 2,
+        "required_fields_extracted": 2,
+        "ratio": 1.0
+      },
+      "field_presence": {
+        "invoice_number": true,
+        "date": true,
+        "total_amount": true,
+        "vendor_name": true
+      }
+    }
   },
   "tenant_id": "acme",
   "created_by": "<sub>",
@@ -156,6 +174,16 @@ queued → running → completed
 `result` is only present when `status == "completed"`.
 `result_metadata` is only present when `status == "completed"`.
 `error_message` is present when `status == "failed"` or `"retrying"`.
+
+### Quality metadata (task-level, optional)
+
+When extraction completes, `result_metadata.quality` provides operator-facing quality signals:
+
+- `coverage`: extracted-field coverage across the full requested schema
+- `required_coverage`: extracted-field coverage for required fields only
+- `field_presence`: per-field boolean map indicating whether each schema field was returned
+
+These are deterministic quality metrics derived from schema/result shape. They are not model-native confidence scores.
 
 ---
 
@@ -218,7 +246,7 @@ The worker stores stable taxonomy prefixes in `error_message` for easier filteri
 
 - File pointer input (S3 key / presigned URL) — tracked as next mode.
 - Nested object/array schema types in extraction result contract.
-- Per-field confidence scores.
+- Model-native per-field confidence scores.
 - Streaming results.
 - Client-provided idempotency keys.
 

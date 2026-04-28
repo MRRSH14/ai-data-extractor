@@ -135,6 +135,7 @@ Smoke checks now validate:
 - extractor scenario #1 (`invoice_id`, `amount`, `is_paid`)
 - extractor scenario #2 (`po_number`, `vendor_name`, `item_count`, `has_late_fee`)
 - `result_metadata` presence on completed tasks (`provider`, `model_id`, `processed_at`)
+- `result_metadata.quality` metrics on completed tasks (`coverage`, `required_coverage`, `field_presence`)
 
 ### Tenant onboarding acceptance check
 

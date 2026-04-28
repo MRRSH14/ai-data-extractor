@@ -423,13 +423,51 @@ def _invoke_bedrock_extract(text: str, schema: dict) -> dict:
     return _coerce_and_validate_result(parsed, schema)
 
 
-def _store_completed_result(tasks_table, task_id: str, result: dict) -> None:
+def _build_quality_metadata(schema: dict, result: dict) -> dict:
+    total_fields = len(schema)
+    extracted_fields = len(result)
+    required_fields = 0
+    extracted_required_fields = 0
+    field_presence: dict[str, bool] = {}
+
+    for field_name, descriptor in schema.items():
+        has_value = field_name in result
+        field_presence[field_name] = has_value
+        if isinstance(descriptor, dict) and bool(descriptor.get("required", False)):
+            required_fields += 1
+            if has_value:
+                extracted_required_fields += 1
+
+    coverage_ratio = 1.0 if total_fields == 0 else round(extracted_fields / total_fields, 4)
+    required_coverage_ratio = (
+        1.0
+        if required_fields == 0
+        else round(extracted_required_fields / required_fields, 4)
+    )
+
+    return {
+        "coverage": {
+            "schema_fields_total": total_fields,
+            "schema_fields_extracted": extracted_fields,
+            "ratio": coverage_ratio,
+        },
+        "required_coverage": {
+            "required_fields_total": required_fields,
+            "required_fields_extracted": extracted_required_fields,
+            "ratio": required_coverage_ratio,
+        },
+        "field_presence": field_presence,
+    }
+
+
+def _store_completed_result(tasks_table, task_id: str, result: dict, schema: dict) -> None:
     updated_at = datetime.now(timezone.utc).isoformat()
     model_id = os.getenv("BEDROCK_MODEL_ID", "")
     metadata = {
         "provider": "bedrock",
         "model_id": model_id,
         "processed_at": updated_at,
+        "quality": _build_quality_metadata(schema, result),
     }
     tasks_table.update_item(
         Key={"task_id": task_id},
@@ -469,7 +507,7 @@ def process_record(tasks_table, payload: dict) -> None:
 
     text, schema = _validate_extract_payload(payload)
     result = _invoke_bedrock_extract(text, schema)
-    _store_completed_result(tasks_table, task_id, result)
+    _store_completed_result(tasks_table, task_id, result, schema)
 
     logger.info(
         "Task processing completed",
