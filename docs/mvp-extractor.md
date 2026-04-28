@@ -55,6 +55,10 @@ For the current MVP implementation, the worker invokes Claude through Amazon Bed
 | `input.schema[field].description` | string | no | Plain-language hint sent to the LLM |
 | `input.schema[field].required` | boolean | no | Default `false`; if `true` and model omits it -> task fails |
 | `input.schema[field].enum` | array | no | Non-empty list of allowed values; element type must match `type` |
+| `input.schema[field].min_length` | integer | no | `string` fields only; non-negative; minimum allowed output length |
+| `input.schema[field].max_length` | integer | no | `string` fields only; non-negative; maximum allowed output length |
+| `input.schema[field].minimum` | number | no | `number` fields only; minimum allowed numeric value |
+| `input.schema[field].maximum` | number | no | `number` fields only; maximum allowed numeric value |
 
 **Example:**
 
@@ -131,7 +135,7 @@ For the current MVP implementation, the worker invokes Claude through Amazon Bed
   "task_id": "task-a1b2c3d4",
   "status": "failed",
   "job_type": "extract",
-  "error_message": "Required field 'invoice_number' missing from LLM response",
+  "error_message": "[SCHEMA_VALIDATION] required field \"invoice_number\" missing from model output",
   "tenant_id": "acme",
   "created_by": "<sub>",
   "created_at": "2024-03-15T10:00:00Z",
@@ -164,6 +168,7 @@ queued → running → completed
 | Unknown `mode` value | API returns **400** | No | Only `"text"` supported in MVP |
 | Required schema field absent in extraction output | `failed` | No | Non-retryable contract/validation issue |
 | Extracted value violates enum constraint | `failed` | No | Non-retryable contract/validation issue |
+| Extracted value violates min/max or length constraints | `failed` | No | Non-retryable schema validation issue |
 | Worker payload/schema validation fails | `failed` | No | Non-retryable malformed input path |
 | Bedrock timeout / network error | `retrying` | Yes | SQS retries up to `maxReceiveCount`; then DLQ |
 | Bedrock throttling (`ThrottlingException`) | `retrying` | Yes | Same retry path |
@@ -187,8 +192,25 @@ The worker distinguishes failures before raising:
 3. `input.schema` must be a non-empty object with ≤ 20 keys.
 4. Each schema field descriptor must have a valid `type` (`"string"`, `"number"`, `"boolean"`).
 5. If `enum` is provided, it must be a non-empty array with element types matching descriptor `type`.
+6. `min_length` / `max_length` are optional for `string` fields and must be non-negative integers.
+7. `minimum` / `maximum` are optional for `number` fields and must be numeric.
+8. If both are provided, `min_length <= max_length` and `minimum <= maximum`.
 
-These return **400** with a descriptive `error` string.
+These return **400** with a descriptive `error` string and an `error_code` (for example `INPUT_CONTRACT`, `SCHEMA_INVALID`).
+
+### Error taxonomy (operator-facing)
+
+The worker stores stable taxonomy prefixes in `error_message` for easier filtering/triage:
+
+- `[INPUT_CONTRACT] ...`
+- `[SCHEMA_INVALID] ...`
+- `[SCHEMA_VALIDATION] ...`
+- `[MODEL_OUTPUT_INVALID] ...`
+- `[CONFIG_ERROR] ...`
+- `[BEDROCK_CONFIG] ...`
+- `[BEDROCK_ACCESS] ...`
+- `[BEDROCK_RESPONSE_INVALID] ...`
+- Retryable path: `[WORKER_TRANSIENT:<ExceptionType>] ...`
 
 ---
 

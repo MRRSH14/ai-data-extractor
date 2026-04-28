@@ -157,6 +157,10 @@ For each schema field descriptor:
 - `type`: one of `string`, `number`, `boolean`
 - `required` (optional): boolean; missing required output field causes terminal `failed`
 - `enum` (optional): non-empty array of allowed values; API validates enum element types against `type`, and worker enforces the constraint after normalization/coercion
+- `min_length` / `max_length` (optional, `string` only): non-negative integers; worker enforces extracted text length bounds
+- `minimum` / `maximum` (optional, `number` only): numeric bounds; worker enforces range after numeric coercion
+- Invalid payload/schema checks now return API `400` with `error` and `error_code` (for example `INPUT_CONTRACT`, `SCHEMA_INVALID`)
+- Worker terminal/retryable failures now prefix `error_message` with stable taxonomy codes (for example `[SCHEMA_VALIDATION] ...`, `[BEDROCK_ACCESS] ...`, `[WORKER_TRANSIENT:TimeoutError] ...`)
 
 ## Roadmap summary
 

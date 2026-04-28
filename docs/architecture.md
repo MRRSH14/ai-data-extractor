@@ -50,7 +50,7 @@ Supporting pieces (not shown in detail above):
    The Lambda handler dispatches on path and method (`src/service/api_handler.py`): `/health`, `/hello`, `POST /tasks`, `GET /tasks/{id}`.
 
 3. **Task creation (`POST /tasks`)**  
-   - Validates JSON body (`job_type="extract"`, `input.mode="text"`, `input.text`, and schema descriptor rules including `required` and `enum` constraints).  
+   - Validates JSON body (`job_type="extract"`, `input.mode="text"`, `input.text`, and schema descriptor rules including `required`, `enum`, `min_length`/`max_length`, and `minimum`/`maximum`).  
    - Writes a new item to DynamoDB, then sends a JSON message to the tasks queue, then updates status to **queued** (see [Task state](#task-state-transitions)).  
    - Returns **202 Accepted** with the task payload including current status.
 
@@ -65,7 +65,7 @@ Task routes now require JWT authentication at API Gateway. API handlers also enf
    The worker is triggered by the tasks queue (`SqsEventSource`, batch size 1).
 
 2. **Processing**  
-   The worker parses the payload, sets status to **running**, invokes Bedrock for extraction, validates/coerces output against schema constraints (`type`, `required`, `enum`), then sets **completed** on success and stores `result` plus `result_metadata`.
+   The worker parses the payload, sets status to **running**, invokes Bedrock for extraction, validates/coerces output against schema constraints (`type`, `required`, `enum`, range/length bounds), then sets **completed** on success and stores `result` plus `result_metadata`.
 
 3. **Failures**  
    - **Validation / bad message** (`ValueError`): task is marked **failed** with an error message; the invocation does not rethrow, so SQS treats the message as successfully processed and deletes it.  
@@ -99,7 +99,7 @@ Statuses are stored in DynamoDB on the task item (`status` field). The API and w
 | `queued` | After the message has been sent to SQS and the create path has updated DynamoDB. |
 | `running` | Worker has started processing the message. |
 | `completed` | Worker finished successfully. |
-| `failed` | Worker determined the message is invalid or terminally bad (`ValueError` path). |
+| `failed` | Worker determined the message is invalid or terminally bad (`NonRetryableProcessingError` path). |
 | `retrying` | Worker hit a non-terminal error, updated DynamoDB, then rethrew so SQS can retry. |
 
 ```mermaid
@@ -156,6 +156,7 @@ These are candidate capabilities to grow from extraction MVP to a more complete 
 
 - **File ingestion mode:** support S3 pointers/presigned upload flows, with optional Textract for scanned documents.
 - **Schema richness (next):** nested objects/arrays and reusable schema templates. (Top-level `required` and `enum` are now implemented.)
+- **Schema richness (next):** nested objects/arrays and reusable schema templates. (Top-level `required`, `enum`, range, and string length constraints are now implemented.)
 - **Quality controls:** confidence scoring, field-level provenance snippets, and configurable validation strictness.
 - **Human review loop:** optional review queue for low-confidence outputs before downstream commit.
 - **Result storage strategy:** large output artifacts in S3 with DynamoDB metadata pointers and lifecycle policies.

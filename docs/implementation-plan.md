@@ -21,10 +21,11 @@ This repository is now productized from the `platform-v1` baseline. Treat the ex
 Recent completion notes:
 
 - Worker now uses Bedrock extraction path with robust JSON parsing and schema validation.
-- Schema constraints now enforce `required` and `enum` (API validation + worker runtime enforcement).
+- Schema constraints now enforce `required`, `enum`, `min_length`/`max_length`, and `minimum`/`maximum` (API validation + worker runtime enforcement).
 - Completed-task contract includes `result_metadata` (`provider`, `model_id`, `processed_at`).
 - Smoke coverage includes two extractor scenarios and cross-tenant denial.
 - Unit tests added for parser/coercion helpers in `src/tests/unit/test_worker_handler_helpers.py`.
+- Operator-facing error taxonomy is now standardized in API/worker responses (`error_code` for API 400s and coded `error_message` prefixes in worker failures).
 
 ---
 

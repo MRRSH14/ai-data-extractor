@@ -68,6 +68,19 @@ dynamodb = boto3.resource("dynamodb")
 IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60
 
 
+class ErrorCode:
+    VALIDATION_ERROR = "VALIDATION_ERROR"
+    INPUT_CONTRACT = "INPUT_CONTRACT"
+    SCHEMA_INVALID = "SCHEMA_INVALID"
+    SCHEMA_VALIDATION = "SCHEMA_VALIDATION"
+    MODEL_OUTPUT_INVALID = "MODEL_OUTPUT_INVALID"
+    CONFIG_ERROR = "CONFIG_ERROR"
+    BEDROCK_CONFIG = "BEDROCK_CONFIG"
+    BEDROCK_ACCESS = "BEDROCK_ACCESS"
+    BEDROCK_RESPONSE_INVALID = "BEDROCK_RESPONSE_INVALID"
+    WORKER_TRANSIENT = "WORKER_TRANSIENT"
+
+
 def json_response(status_code: int, payload: dict) -> dict:
     def _json_default(value):
         if isinstance(value, Decimal):
