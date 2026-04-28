@@ -25,12 +25,12 @@ def test_build_quality_metadata_reports_coverage_and_field_presence() -> None:
     assert quality["coverage"] == {
         "schema_fields_total": 3,
         "schema_fields_extracted": 2,
-        "ratio": 0.6667,
+        "ratio": Decimal("0.6667"),
     }
     assert quality["required_coverage"] == {
         "required_fields_total": 2,
         "required_fields_extracted": 2,
-        "ratio": 1.0,
+        "ratio": Decimal("1.0000"),
     }
     assert quality["field_presence"] == {
         "invoice_id": True,

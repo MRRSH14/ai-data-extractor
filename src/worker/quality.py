@@ -1,3 +1,6 @@
+from decimal import Decimal
+
+
 def build_quality_metadata(schema: dict, result: dict) -> dict:
     total_fields = len(schema)
     extracted_fields = len(result)
@@ -13,9 +16,17 @@ def build_quality_metadata(schema: dict, result: dict) -> dict:
             if has_value:
                 extracted_required_fields += 1
 
-    coverage_ratio = 1.0 if total_fields == 0 else round(extracted_fields / total_fields, 4)
+    coverage_ratio = (
+        Decimal("1.0")
+        if total_fields == 0
+        else (Decimal(extracted_fields) / Decimal(total_fields)).quantize(Decimal("0.0001"))
+    )
     required_coverage_ratio = (
-        1.0 if required_fields == 0 else round(extracted_required_fields / required_fields, 4)
+        Decimal("1.0")
+        if required_fields == 0
+        else (Decimal(extracted_required_fields) / Decimal(required_fields)).quantize(
+            Decimal("0.0001")
+        )
     )
 
     return {
