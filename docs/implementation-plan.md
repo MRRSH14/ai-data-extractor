@@ -31,6 +31,31 @@ Recent completion notes:
 
 ---
 
+## Upcoming implementation phases
+
+### Phase 3 — Input expansion
+
+- [ ] Add file input mode (S3/object reference) in addition to text mode.
+- [ ] Introduce document preprocessing (PDF/text normalization) before extraction.
+- [ ] Add async file lifecycle states and validations for file-mode tasks.
+- [ ] Keep the same `/tasks` contract with mode-based processing.
+
+### Phase 4 — Scale and reliability
+
+- [ ] Throughput tuning (batching, concurrency, backpressure controls).
+- [ ] Idempotency and TTL policy review for higher request volume.
+- [ ] Retry policy refinement by error type/classification.
+- [ ] DLQ redrive automation tooling (safer, filtered replay).
+
+### Phase 5 — Multi-tenant product features
+
+- [ ] Tenant-specific model and configuration selection.
+- [ ] Tenant usage/cost metering and enforceable limits.
+- [ ] Audit trail/reporting endpoints for compliance and operations.
+- [ ] Admin/operator APIs for task search and incident handling.
+
+---
+
 ## Original 4-week sprint (baseline)
 
 This is the plan you started from; it prioritizes **documentation, state semantics, auth/tenancy, observability** before the AI layer.
