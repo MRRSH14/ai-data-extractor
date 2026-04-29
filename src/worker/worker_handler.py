@@ -9,6 +9,7 @@ from worker.errors import (
     NonRetryableProcessingError,
     retryable_error_message as _retryable_error_message,
 )
+from worker.file_loader import load_s3_text_object
 from worker.parsing import parse_task_payload
 from worker.quality import build_quality_metadata
 from worker.validation import (
@@ -81,7 +82,13 @@ def process_record(tasks_table, payload: dict) -> None:
 
     update_task_status(tasks_table, task_id, "running")
 
-    text, schema = validate_extract_payload(payload)
+    input_spec, schema = validate_extract_payload(payload)
+    if input_spec["mode"] == "text":
+        text = input_spec["text"]
+    else:
+        file_ref = input_spec["file"]
+        text = load_s3_text_object(file_ref["bucket"], file_ref["key"])
+
     result = invoke_bedrock_extract(text, schema)
     _store_completed_result(tasks_table, task_id, result, schema)
 

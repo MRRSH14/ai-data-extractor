@@ -57,3 +57,36 @@ def test_validate_extract_input_rejects_invalid_number_bounds() -> None:
     body = json.loads(resp["body"])
     assert body["error_code"] == "SCHEMA_INVALID"
     assert "minimum cannot exceed maximum" in body["error"]
+
+
+def test_validate_extract_input_accepts_file_mode_s3_reference() -> None:
+    payload = {
+        "mode": "file",
+        "file": {
+            "source": "s3",
+            "bucket": "invoices-bucket",
+            "key": "raw/invoice-001.txt",
+        },
+        "schema": {
+            "invoice_id": {"type": "string", "required": True},
+        },
+    }
+    assert validate_extract_input(payload, correlation_id="corr-1") is None
+
+
+def test_validate_extract_input_rejects_file_mode_missing_bucket() -> None:
+    payload = {
+        "mode": "file",
+        "file": {
+            "source": "s3",
+            "key": "raw/invoice-001.txt",
+        },
+        "schema": {
+            "invoice_id": {"type": "string"},
+        },
+    }
+    resp = validate_extract_input(payload, correlation_id="corr-1")
+    assert resp is not None
+    body = json.loads(resp["body"])
+    assert body["error_code"] == "INPUT_CONTRACT"
+    assert "input.file.bucket must be a non-empty string" == body["error"]

@@ -30,26 +30,58 @@ def validate_extract_input(input_value: object, *, correlation_id: str) -> dict 
         )
 
     mode = input_value.get("mode")
-    if mode != "text":
-        return validation_error(
-            correlation_id, 'input.mode must be "text"', error_code=ErrorCode.INPUT_CONTRACT
-        )
-
-    text = input_value.get("text")
-    if not isinstance(text, str):
-        return validation_error(
-            correlation_id, "input.text must be a string", error_code=ErrorCode.INPUT_CONTRACT
-        )
-    if not text.strip():
-        return validation_error(
-            correlation_id, "input.text must be non-empty", error_code=ErrorCode.INPUT_CONTRACT
-        )
-    if len(text) > MAX_TEXT_LENGTH:
+    if mode not in {"text", "file"}:
         return validation_error(
             correlation_id,
-            f"input.text exceeds max length of {MAX_TEXT_LENGTH}",
+            'input.mode must be either "text" or "file"',
             error_code=ErrorCode.INPUT_CONTRACT,
         )
+
+    if mode == "text":
+        text = input_value.get("text")
+        if not isinstance(text, str):
+            return validation_error(
+                correlation_id, "input.text must be a string", error_code=ErrorCode.INPUT_CONTRACT
+            )
+        if not text.strip():
+            return validation_error(
+                correlation_id, "input.text must be non-empty", error_code=ErrorCode.INPUT_CONTRACT
+            )
+        if len(text) > MAX_TEXT_LENGTH:
+            return validation_error(
+                correlation_id,
+                f"input.text exceeds max length of {MAX_TEXT_LENGTH}",
+                error_code=ErrorCode.INPUT_CONTRACT,
+            )
+    else:  # mode == "file"
+        file_ref = input_value.get("file")
+        if not isinstance(file_ref, dict):
+            return validation_error(
+                correlation_id,
+                "input.file must be an object when input.mode is \"file\"",
+                error_code=ErrorCode.INPUT_CONTRACT,
+            )
+        source = file_ref.get("source")
+        if source != "s3":
+            return validation_error(
+                correlation_id,
+                'input.file.source must be "s3"',
+                error_code=ErrorCode.INPUT_CONTRACT,
+            )
+        bucket = file_ref.get("bucket")
+        if not isinstance(bucket, str) or not bucket.strip():
+            return validation_error(
+                correlation_id,
+                "input.file.bucket must be a non-empty string",
+                error_code=ErrorCode.INPUT_CONTRACT,
+            )
+        key = file_ref.get("key")
+        if not isinstance(key, str) or not key.strip():
+            return validation_error(
+                correlation_id,
+                "input.file.key must be a non-empty string",
+                error_code=ErrorCode.INPUT_CONTRACT,
+            )
 
     schema = input_value.get("schema")
     if not isinstance(schema, dict) or not schema:

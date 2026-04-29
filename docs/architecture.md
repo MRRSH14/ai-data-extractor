@@ -52,7 +52,7 @@ Supporting pieces (not shown in detail above):
    Public routes (`/health`, `/hello`) do not require task queue/table environment setup. Task-specific dependencies are loaded only for `/tasks` routes.
 
 3. **Task creation (`POST /tasks`)**  
-   - Validates JSON body (`job_type="extract"`, `input.mode="text"`, `input.text`, and schema descriptor rules including `required`, `enum`, `min_length`/`max_length`, and `minimum`/`maximum`).  
+  - Validates JSON body (`job_type="extract"`, `input.mode in {"text","file"}`, mode-specific input fields, and schema descriptor rules including `required`, `enum`, `min_length`/`max_length`, and `minimum`/`maximum`).  
    - Writes a new item to DynamoDB, then sends a JSON message to the tasks queue, then updates status to **queued** (see [Task state](#task-state-transitions)).  
    - Returns **202 Accepted** with the task payload including current status.
 
@@ -67,7 +67,7 @@ Task routes now require JWT authentication at API Gateway. API handlers also enf
    The worker is triggered by the tasks queue (`SqsEventSource`, batch size 1).
 
 2. **Processing**  
-   The worker parses the payload, sets status to **running**, invokes Bedrock for extraction, validates/coerces output against schema constraints (`type`, `required`, `enum`, range/length bounds), then sets **completed** on success and stores `result` plus `result_metadata`.
+  The worker parses the payload, sets status to **running**, resolves extraction text (inline text mode or S3 UTF-8 object for file mode), invokes Bedrock for extraction, validates/coerces output against schema constraints (`type`, `required`, `enum`, range/length bounds), then sets **completed** on success and stores `result` plus `result_metadata`.
 
 3. **Failures**  
    - **Validation / bad message** (`ValueError`): task is marked **failed** with an error message; the invocation does not rethrow, so SQS treats the message as successfully processed and deletes it.  

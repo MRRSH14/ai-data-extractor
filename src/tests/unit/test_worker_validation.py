@@ -9,7 +9,7 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "test")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
 
 from worker.errors import NonRetryableProcessingError
-from worker.validation import coerce_and_validate_result
+from worker.validation import coerce_and_validate_result, validate_extract_payload
 
 
 def test_coerce_and_validate_result_normalizes_supported_types() -> None:
@@ -103,3 +103,24 @@ def test_coerce_and_validate_result_rejects_number_below_minimum() -> None:
     raw = {"score": 5}
     with pytest.raises(NonRetryableProcessingError, match=r"SCHEMA_VALIDATION.*must be >= 10"):
         coerce_and_validate_result(raw, schema)
+
+
+def test_validate_extract_payload_accepts_file_mode_s3_reference() -> None:
+    payload = {
+        "job_type": "extract",
+        "input": {
+            "mode": "file",
+            "file": {
+                "source": "s3",
+                "bucket": "invoices-bucket",
+                "key": "raw/invoice-001.txt",
+            },
+            "schema": {"invoice_id": {"type": "string"}},
+        },
+    }
+
+    input_spec, schema = validate_extract_payload(payload)
+    assert input_spec["mode"] == "file"
+    assert input_spec["file"]["bucket"] == "invoices-bucket"
+    assert input_spec["file"]["key"] == "raw/invoice-001.txt"
+    assert "invoice_id" in schema

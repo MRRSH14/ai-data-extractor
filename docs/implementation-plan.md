@@ -40,6 +40,22 @@ Recent completion notes:
 - [ ] Add async file lifecycle states and validations for file-mode tasks.
 - [ ] Keep the same `/tasks` contract with mode-based processing.
 
+Step Functions adoption guideline (for Phase 3+):
+
+- Keep the current `API -> SQS -> worker` flow while processing is short and mostly single-step.
+- Introduce Step Functions when at least two conditions are true:
+  - multiple branching paths by input type (text/pdf/image/url),
+  - async external jobs (for example Textract start + poll/callback),
+  - long-running pipelines or per-step timeout/retry policies,
+  - requirement for operator-visible stage-by-stage execution history.
+- Use Textract only for OCR/layout-required documents (scans/images/complex PDFs); keep direct text decode for plain UTF-8 text files.
+
+Current sequence:
+
+1. Implement S3 file mode with UTF-8 text objects in worker (same extraction path as text mode).
+2. Add document preprocessing path (PDF/image) using Textract.
+3. Add file lifecycle states and then evaluate Step Functions orchestration once branching + async stages are active.
+
 ### Phase 4 — Scale and reliability
 
 - [ ] Throughput tuning (batching, concurrency, backpressure controls).

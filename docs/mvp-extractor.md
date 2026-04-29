@@ -7,10 +7,13 @@ This document defines the **input contract, schema format, output contract, and 
 ## Overview
 
 A caller submits a task with `job_type=extract` and provides:
-1. The **full source text to extract from** as an inline string in the request body (≤ 32 KB for MVP).
+1. Input in `mode="text"` (inline text) or `mode="file"` (S3 object reference).
 2. A **schema** describing the fields they want back.
 
-For MVP, file paths, S3 pointers, and uploaded files are out of scope for execution input. Those are planned as a later mode.
+Current execution status:
+- `mode="text"` is fully implemented.
+- `mode="file"` supports S3 UTF-8 text objects (`source="s3"` + `bucket` + `key`) and reuses the same extraction pipeline after loading object content as text.
+- PDF/image preprocessing is not implemented yet.
 
 For the current MVP implementation, the worker invokes Claude through Amazon Bedrock, validates payload/schema shape, and persists the result. The caller polls `GET /tasks/{id}` until status is `completed` or `failed`.
 
@@ -48,8 +51,12 @@ For the current MVP implementation, the worker invokes Claude through Amazon Bed
 | Field | Type | Required | Constraints |
 |---|---|---|---|
 | `job_type` | string | yes | Must be `"extract"` |
-| `input.mode` | string | yes | Must be `"text"` (only supported mode in MVP) |
+| `input.mode` | string | yes | Must be `"text"` or `"file"` |
 | `input.text` | string | yes | 1 – 32 768 characters |
+| `input.file` | object | no | Required when `mode="file"` |
+| `input.file.source` | string | no | Required for `mode="file"`; must be `"s3"` |
+| `input.file.bucket` | string | no | Required for `mode="file"`; non-empty |
+| `input.file.key` | string | no | Required for `mode="file"`; non-empty |
 | `input.schema` | object | yes | 1 – 20 top-level keys; each key is a field descriptor |
 | `input.schema[field].type` | string | yes | One of `"string"`, `"number"`, `"boolean"` |
 | `input.schema[field].description` | string | no | Plain-language hint sent to the LLM |
@@ -193,7 +200,9 @@ These are deterministic quality metrics derived from schema/result shape. They a
 |---|---|---|---|
 | `text` empty or > 32 KB | API returns **400** | No | Rejected at API layer before task is created |
 | `schema` missing or empty | API returns **400** | No | Rejected at API layer |
-| Unknown `mode` value | API returns **400** | No | Only `"text"` supported in MVP |
+| Unknown `mode` value | API returns **400** | No | Only `"text"` and `"file"` are valid values |
+| `mode="file"` with invalid S3 reference shape | API returns **400** | No | Rejected at API layer |
+| `mode="file"` S3 object is missing / denied / invalid text | `failed` | No | Deterministic input-contract failure from worker |
 | Required schema field absent in extraction output | `failed` | No | Non-retryable contract/validation issue |
 | Extracted value violates enum constraint | `failed` | No | Non-retryable contract/validation issue |
 | Extracted value violates min/max or length constraints | `failed` | No | Non-retryable schema validation issue |
@@ -215,14 +224,15 @@ The worker distinguishes failures before raising:
 
 `POST /tasks` gains the following checks when `job_type == "extract"`:
 
-1. `input.mode` must be `"text"`.
-2. `input.text` must be a non-empty string ≤ 32 768 characters.
-3. `input.schema` must be a non-empty object with ≤ 20 keys.
-4. Each schema field descriptor must have a valid `type` (`"string"`, `"number"`, `"boolean"`).
-5. If `enum` is provided, it must be a non-empty array with element types matching descriptor `type`.
-6. `min_length` / `max_length` are optional for `string` fields and must be non-negative integers.
-7. `minimum` / `maximum` are optional for `number` fields and must be numeric.
-8. If both are provided, `min_length <= max_length` and `minimum <= maximum`.
+1. `input.mode` must be `"text"` or `"file"`.
+2. For `mode="text"`, `input.text` must be a non-empty string ≤ 32 768 characters.
+3. For `mode="file"`, `input.file` must be an object with `source="s3"`, non-empty `bucket`, and non-empty `key`.
+4. `input.schema` must be a non-empty object with ≤ 20 keys.
+5. Each schema field descriptor must have a valid `type` (`"string"`, `"number"`, `"boolean"`).
+6. If `enum` is provided, it must be a non-empty array with element types matching descriptor `type`.
+7. `min_length` / `max_length` are optional for `string` fields and must be non-negative integers.
+8. `minimum` / `maximum` are optional for `number` fields and must be numeric.
+9. If both are provided, `min_length <= max_length` and `minimum <= maximum`.
 
 These return **400** with a descriptive `error` string and an `error_code` (for example `INPUT_CONTRACT`, `SCHEMA_INVALID`).
 

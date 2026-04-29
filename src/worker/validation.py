@@ -4,7 +4,7 @@ from shared import ErrorCode
 from worker.errors import non_retryable
 
 
-def validate_extract_payload(payload: dict) -> tuple[str, dict]:
+def validate_extract_payload(payload: dict) -> tuple[dict, dict]:
     job_type = payload.get("job_type")
     if job_type != "extract":
         raise non_retryable(ErrorCode.INPUT_CONTRACT, 'job_type must be "extract"')
@@ -14,18 +14,44 @@ def validate_extract_payload(payload: dict) -> tuple[str, dict]:
         raise non_retryable(ErrorCode.INPUT_CONTRACT, "input must be an object")
 
     mode = input_value.get("mode")
-    if mode != "text":
-        raise non_retryable(ErrorCode.INPUT_CONTRACT, 'input.mode must be "text"')
-
-    text = input_value.get("text")
-    if not isinstance(text, str) or not text.strip():
-        raise non_retryable(ErrorCode.INPUT_CONTRACT, "input.text must be a non-empty string")
+    if mode == "text":
+        text = input_value.get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise non_retryable(ErrorCode.INPUT_CONTRACT, "input.text must be a non-empty string")
+        input_spec = {"mode": "text", "text": text}
+    elif mode == "file":
+        file_ref = input_value.get("file")
+        if not isinstance(file_ref, dict):
+            raise non_retryable(
+                ErrorCode.INPUT_CONTRACT,
+                "input.file must be an object when input.mode is \"file\"",
+            )
+        if file_ref.get("source") != "s3":
+            raise non_retryable(ErrorCode.INPUT_CONTRACT, 'input.file.source must be "s3"')
+        bucket = file_ref.get("bucket")
+        if not isinstance(bucket, str) or not bucket.strip():
+            raise non_retryable(
+                ErrorCode.INPUT_CONTRACT,
+                "input.file.bucket must be a non-empty string",
+            )
+        key = file_ref.get("key")
+        if not isinstance(key, str) or not key.strip():
+            raise non_retryable(
+                ErrorCode.INPUT_CONTRACT,
+                "input.file.key must be a non-empty string",
+            )
+        input_spec = {"mode": "file", "file": {"bucket": bucket, "key": key}}
+    else:
+        raise non_retryable(
+            ErrorCode.INPUT_CONTRACT,
+            'input.mode must be either "text" or "file"',
+        )
 
     schema = input_value.get("schema")
     if not isinstance(schema, dict) or not schema:
         raise non_retryable(ErrorCode.INPUT_CONTRACT, "input.schema must be a non-empty object")
 
-    return text, schema
+    return input_spec, schema
 
 
 def coerce_and_validate_result(raw_result: object, schema: dict) -> dict:
