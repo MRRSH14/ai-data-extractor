@@ -9,6 +9,7 @@ from aws_cdk import (
     aws_cloudwatch_actions as cw_actions,
     aws_cognito as cognito,
     aws_iam as iam,
+    aws_s3 as s3,
 )
 from constructs import Construct
 from aws_cdk.aws_apigatewayv2 import HttpApi, HttpMethod
@@ -97,6 +98,15 @@ class InfraStack(Stack):
             ),
         )
 
+        ingestion_bucket = s3.Bucket(
+            self,
+            "InputDocumentsBucket",
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True,
+            enforce_ssl=True,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+        )
+
         user_pool = cognito.UserPool(
             self,
             "TasksUserPool",
@@ -175,6 +185,7 @@ class InfraStack(Stack):
                 "TASKS_TABLE_NAME": tasks_table.table_name,
                 "BEDROCK_MODEL_ID": os.getenv("BEDROCK_MODEL_ID", ""),
                 "BEDROCK_REGION": os.getenv("BEDROCK_REGION", ""),
+                "INPUT_S3_BUCKET": ingestion_bucket.bucket_name,
             },
         )
         worker_lambda.add_event_source(
@@ -197,6 +208,7 @@ class InfraStack(Stack):
 
         tasks_queue.grant_consume_messages(worker_lambda)
         tasks_table.grant_read_write_data(worker_lambda)
+        ingestion_bucket.grant_read(worker_lambda)
         bedrock_model_id = os.getenv("BEDROCK_MODEL_ID", "")
         bedrock_region = os.getenv("BEDROCK_REGION", "").strip() or self.region
         bedrock_resources = _bedrock_invoke_resources(
@@ -304,4 +316,10 @@ class InfraStack(Stack):
             "TasksUserPoolClientId",
             value=user_pool_client.user_pool_client_id,
             description="Cognito User Pool App Client ID (JWT audience).",
+        )
+        CfnOutput(
+            self,
+            "InputDocumentsBucketName",
+            value=ingestion_bucket.bucket_name,
+            description="S3 bucket for file-mode extraction input documents.",
         )

@@ -15,6 +15,11 @@ Current execution status:
 - `mode="file"` supports S3 UTF-8 text objects (`source="s3"` + `bucket` + `key`) and reuses the same extraction pipeline after loading object content as text.
 - PDF/image preprocessing is not implemented yet.
 
+Latest smoke evidence (2026-05-06):
+- Valid UTF-8 S3 object completed successfully with expected extraction keys.
+- Missing S3 key failed deterministically with `[INPUT_CONTRACT] s3 object not found`.
+- Non-UTF8 S3 object failed deterministically with `[INPUT_CONTRACT] ... must be UTF-8 text`.
+
 For the current MVP implementation, the worker invokes Claude through Amazon Bedrock, validates payload/schema shape, and persists the result. The caller polls `GET /tasks/{id}` until status is `completed` or `failed`.
 
 **LLM backend (current):** Claude via Amazon Bedrock (`bedrock-runtime`). Auth is IAM (no API keys). Worker IAM grants `bedrock:InvokeModel` on scoped resources derived from `BEDROCK_MODEL_ID` (including compatibility ARN variants used by inference-profile-backed invokes). No third-party SDK bundling is required; `boto3` covers the Bedrock client.
@@ -254,7 +259,7 @@ The worker stores stable taxonomy prefixes in `error_message` for easier filteri
 
 ## Out of scope for MVP
 
-- File pointer input (S3 key / presigned URL) — tracked as next mode.
+- PDF/image OCR preprocessing path (for example Textract integration).
 - Nested object/array schema types in extraction result contract.
 - Model-native per-field confidence scores.
 - Streaming results.
