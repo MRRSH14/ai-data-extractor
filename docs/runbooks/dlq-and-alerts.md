@@ -115,6 +115,27 @@ Use this model to avoid confusion during incidents:
 
 ---
 
+## File-mode triage query (CloudWatch Logs Insights)
+
+Use this when debugging S3 file-mode task failures (`INPUT_CONTRACT` / `CONFIG_ERROR`) in the worker log group:
+
+```sql
+fields @timestamp, @message, task_id, correlation_id, event
+| filter component = "worker"
+| filter event in ["record_error_non_retryable", "record_error_retryable", "task_marked_failed", "task_marked_retrying"]
+| filter @message like /s3 object|UTF-8|BEDROCK_MODEL_ID|INPUT_CONTRACT|CONFIG_ERROR/
+| sort @timestamp desc
+| limit 100
+```
+
+Tip: once you have a `task_id` or `correlation_id`, add another filter for focused tracing:
+
+```sql
+| filter task_id = "task-xxxx" or correlation_id = "xxxxx"
+```
+
+---
+
 ## Operational notes
 
 - **Extractor deterministic failures:** malformed extractor payload/schema issues are marked `failed` and are not retried; these do not reach the DLQ.

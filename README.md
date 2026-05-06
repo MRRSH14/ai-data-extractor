@@ -93,7 +93,7 @@ Also ensure the AWS IAM role used by GitHub OIDC trust policy allows this reposi
 - **Observability (logs, correlation IDs, alarms):** [docs/observability.md](docs/observability.md)
 - **DLQ, redrive, alarms:** [docs/runbooks/dlq-and-alerts.md](docs/runbooks/dlq-and-alerts.md)
 - **Helper script:** `scripts/dlq_redrive.py` (requires `boto3`)
-- **Dev auth/test scripts:** `scripts/dev_setup.sh`, `scripts/dev_test_endpoints.sh`, `scripts/dev_onboard_user.sh`
+- **Dev auth/test scripts:** `scripts/dev_setup.sh`, `scripts/dev_smoke_all.sh`, `scripts/dev_test_endpoints.sh`, `scripts/dev_test_file_mode.sh`, `scripts/dev_onboard_user.sh`
 
 Task statuses and the split between **DynamoDB status** and **SQS/DLQ** behavior are documented in **architecture** and the runbook; after max retries, a message can sit in the DLQ while DynamoDB may still show `retrying` until you redrive or update the record.
 
@@ -128,6 +128,26 @@ You can run endpoint tests directly if you already have tokens:
 
 ```bash
 API_URL="..." TEST_ID_TOKEN="..." DEMO_ID_TOKEN="..." ./scripts/dev_test_endpoints.sh
+```
+
+### One-command smoke runner
+
+Use the unified smoke runner to set up auth/env and execute text + file smoke checks:
+
+```bash
+./scripts/dev_smoke_all.sh
+```
+
+Useful flags:
+
+- `--text-only` (run API text-mode smoke only)
+- `--file-only` (run file-mode smoke only)
+- `--skip-login` (skip `aws sso login` if session is already active)
+
+You can also run file-mode smoke directly when env vars are already set:
+
+```bash
+API_URL="..." TEST_ID_TOKEN="..." INPUT_BUCKET="..." ./scripts/dev_test_file_mode.sh
 ```
 
 Smoke checks now validate:

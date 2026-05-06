@@ -28,6 +28,7 @@ Recent completion notes:
 - Unit tests added for worker helper modules in `src/tests/unit/test_worker_validation.py`, `src/tests/unit/test_worker_bedrock_extract_helpers.py`, and `src/tests/unit/test_worker_quality.py`.
 - Operator-facing error taxonomy is now standardized in API/worker responses (`error_code` for API 400s and coded `error_message` prefixes in worker failures).
 - API/worker refactor completed into focused modules with expanded unit coverage; API router now lazily initializes task dependencies so public routes remain available without queue env setup.
+- Added repeatable smoke tooling for extractor validation: `scripts/dev_test_file_mode.sh` (file-mode scenarios) and `scripts/dev_smoke_all.sh` (single entrypoint for auth + text/file smoke checks).
 
 ---
 
