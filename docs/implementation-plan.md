@@ -30,6 +30,7 @@ Recent completion notes:
 - API/worker refactor completed into focused modules with expanded unit coverage; API router now lazily initializes task dependencies so public routes remain available without queue env setup.
 - Added repeatable smoke tooling for extractor validation: `scripts/dev_test_file_mode.sh` (file-mode scenarios) and `scripts/dev_smoke_all.sh` (single entrypoint for auth + text/file smoke checks).
 - Worker file-mode routing now branches by extension (text decode vs Textract preprocessing), and writes explicit `file_lifecycle_state` markers (`ingested`, `processing`, `extracted`, `failed`) for file task visibility.
+- Live validation confirmed PDF path behavior: deterministic failure for invalid/synthetic PDF and successful extraction for real PDF/image-heavy sample through Textract preprocessing.
 
 ---
 

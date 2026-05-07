@@ -22,6 +22,11 @@ Latest smoke evidence (2026-05-06):
 - Missing S3 key failed deterministically with `[INPUT_CONTRACT] s3 object not found`.
 - Non-UTF8 S3 object failed deterministically with `[INPUT_CONTRACT] ... must be UTF-8 text`.
 
+Latest live validation (2026-05-07):
+- PDF/image route via Textract is active for supported extensions (`.pdf`, `.png`, `.jpg`, `.jpeg`, `.tiff`, `.tif`).
+- Invalid synthetic PDF failed deterministically with `[INPUT_CONTRACT] ... UnsupportedDocumentException`.
+- Real PDF samples (including image-heavy content) completed successfully with extracted fields and `file_lifecycle_state="extracted"`.
+
 For the current MVP implementation, the worker invokes Claude through Amazon Bedrock, validates payload/schema shape, and persists the result. The caller polls `GET /tasks/{id}` until status is `completed` or `failed`.
 
 **LLM backend (current):** Claude via Amazon Bedrock (`bedrock-runtime`). Auth is IAM (no API keys). Worker IAM grants `bedrock:InvokeModel` on scoped resources derived from `BEDROCK_MODEL_ID` (including compatibility ARN variants used by inference-profile-backed invokes). No third-party SDK bundling is required; `boto3` covers the Bedrock client.
