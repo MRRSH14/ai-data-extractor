@@ -14,7 +14,7 @@ def s3_client():
     return boto3.client("s3")
 
 
-def load_s3_text_object(bucket: str, key: str) -> str:
+def load_s3_object_bytes(bucket: str, key: str) -> bytes:
     try:
         response = s3_client().get_object(Bucket=bucket, Key=key)
     except ClientError as exc:
@@ -45,9 +45,14 @@ def load_s3_text_object(bucket: str, key: str) -> str:
             ErrorCode.INPUT_CONTRACT,
             f's3 object content invalid for "{bucket}/{key}"',
         )
+    return bytes(raw_bytes)
+
+
+def load_s3_text_object(bucket: str, key: str) -> str:
+    raw_bytes = load_s3_object_bytes(bucket, key)
 
     try:
-        text = bytes(raw_bytes).decode("utf-8")
+        text = raw_bytes.decode("utf-8")
     except UnicodeDecodeError:
         raise non_retryable(
             ErrorCode.INPUT_CONTRACT,

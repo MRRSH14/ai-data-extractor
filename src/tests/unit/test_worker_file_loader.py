@@ -10,7 +10,7 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "test")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
 
 from worker.errors import NonRetryableProcessingError
-from worker.file_loader import load_s3_text_object
+from worker.file_loader import load_s3_object_bytes, load_s3_text_object
 
 
 class _FakeS3Client:
@@ -57,3 +57,11 @@ def test_load_s3_text_object_rejects_missing_object(monkeypatch: pytest.MonkeyPa
     )
     with pytest.raises(NonRetryableProcessingError, match=r"INPUT_CONTRACT.*s3 object not found"):
         load_s3_text_object("bucket-a", "path/missing.txt")
+
+
+def test_load_s3_object_bytes_returns_raw_bytes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "worker.file_loader.s3_client",
+        lambda: _FakeS3Client(payload=b"abc123"),
+    )
+    assert load_s3_object_bytes("bucket-a", "path/file.bin") == b"abc123"

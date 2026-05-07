@@ -67,7 +67,7 @@ Task routes now require JWT authentication at API Gateway. API handlers also enf
    The worker is triggered by the tasks queue (`SqsEventSource`, batch size 1).
 
 2. **Processing**  
-  The worker parses the payload, sets status to **running**, resolves extraction text (inline text mode or S3 UTF-8 object for file mode), invokes Bedrock for extraction, validates/coerces output against schema constraints (`type`, `required`, `enum`, range/length bounds), then sets **completed** on success and stores `result` plus `result_metadata`.
+  The worker parses the payload, sets status to **running**, resolves extraction text (inline text mode, S3 UTF-8 decode for text-like files, or Textract preprocessing for supported PDF/image files), invokes Bedrock for extraction, validates/coerces output against schema constraints (`type`, `required`, `enum`, range/length bounds), then sets **completed** on success and stores `result` plus `result_metadata`.
 
 3. **Failures**  
    - **Validation / bad message** (`ValueError`): task is marked **failed** with an error message; the invocation does not rethrow, so SQS treats the message as successfully processed and deletes it.  
@@ -118,6 +118,15 @@ stateDiagram-v2
 **Important:** After enough failed attempts, SQS moves the message to the **DLQ**, but DynamoDB may still show **`retrying`** until an operator updates the record or a redrive succeeds. That split between **queue truth** and **stored status** is intentional for this phase; see Week 2 documentation and ADRs for operational semantics.
 
 The sprint roadmap used names like `pending`; in code, the pre-queue state is **`pending_enqueue`** to distinguish it from **`queued`**.
+
+For file-mode tasks, the worker also records a `file_lifecycle_state` marker on the task item:
+
+| file_lifecycle_state | Meaning |
+|---|---|
+| `ingested` | File payload is validated and accepted for worker processing |
+| `processing` | File text normalization/preprocessing is running (decode or Textract path) |
+| `extracted` | Extraction finished successfully for file-mode task |
+| `failed` | File-mode processing hit a deterministic non-retryable failure |
 
 ## Current intentional limitations
 

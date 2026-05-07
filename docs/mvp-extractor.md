@@ -12,8 +12,10 @@ A caller submits a task with `job_type=extract` and provides:
 
 Current execution status:
 - `mode="text"` is fully implemented.
-- `mode="file"` supports S3 UTF-8 text objects (`source="s3"` + `bucket` + `key`) and reuses the same extraction pipeline after loading object content as text.
-- PDF/image preprocessing is not implemented yet.
+- `mode="file"` supports S3 inputs and routes by key extension:
+  - text-like files (`.txt`, `.md`, `.csv`, `.json`) use UTF-8 object decoding,
+  - document/image files (`.pdf`, `.png`, `.jpg`, `.jpeg`, `.tiff`, `.tif`) use Textract text detection before extraction.
+- File-mode lifecycle state is tracked in `file_lifecycle_state` (`ingested`, `processing`, `extracted`, `failed`).
 
 Latest smoke evidence (2026-05-06):
 - Valid UTF-8 S3 object completed successfully with expected extraction keys.
@@ -207,6 +209,7 @@ These are deterministic quality metrics derived from schema/result shape. They a
 | `schema` missing or empty | API returns **400** | No | Rejected at API layer |
 | Unknown `mode` value | API returns **400** | No | Only `"text"` and `"file"` are valid values |
 | `mode="file"` with invalid S3 reference shape | API returns **400** | No | Rejected at API layer |
+| `mode="file"` unsupported extension | `failed` | No | Deterministic input-contract failure from worker |
 | `mode="file"` S3 object is missing / denied / invalid text | `failed` | No | Deterministic input-contract failure from worker |
 | Required schema field absent in extraction output | `failed` | No | Non-retryable contract/validation issue |
 | Extracted value violates enum constraint | `failed` | No | Non-retryable contract/validation issue |
@@ -259,7 +262,7 @@ The worker stores stable taxonomy prefixes in `error_message` for easier filteri
 
 ## Out of scope for MVP
 
-- PDF/image OCR preprocessing path (for example Textract integration).
+- Advanced OCR pipeline orchestration (Textract async jobs + Step Functions).
 - Nested object/array schema types in extraction result contract.
 - Model-native per-field confidence scores.
 - Streaming results.

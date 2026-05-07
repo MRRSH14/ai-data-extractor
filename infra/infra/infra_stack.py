@@ -222,6 +222,12 @@ class InfraStack(Stack):
                 resources=bedrock_resources,
             )
         )
+        worker_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["textract:DetectDocumentText"],
+                resources=["*"],
+            )
+        )
         # Some Bedrock models require AWS Marketplace entitlement checks on first use.
         worker_lambda.add_to_role_policy(
             iam.PolicyStatement(

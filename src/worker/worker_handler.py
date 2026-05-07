@@ -9,8 +9,8 @@ from worker.errors import (
     NonRetryableProcessingError,
     retryable_error_message as _retryable_error_message,
 )
-from worker.file_loader import load_s3_text_object
 from worker.parsing import parse_task_payload
+from worker.preprocessing import preprocess_file_to_text
 from worker.quality import build_quality_metadata
 from worker.validation import (
     validate_extract_payload,
@@ -37,7 +37,22 @@ def _worker_extra(
     return extra
 
 
-def _store_completed_result(tasks_table, task_id: str, result: dict, schema: dict) -> None:
+def _set_file_lifecycle_state(tasks_table, task_id: str, state: str) -> None:
+    tasks_table.update_item(
+        Key={"task_id": task_id},
+        UpdateExpression="SET file_lifecycle_state = :state",
+        ExpressionAttributeValues={":state": state},
+    )
+
+
+def _store_completed_result(
+    tasks_table,
+    task_id: str,
+    result: dict,
+    schema: dict,
+    *,
+    file_lifecycle_state: str | None = None,
+) -> None:
     updated_at = datetime.now(timezone.utc).isoformat()
     model_id = os.getenv("BEDROCK_MODEL_ID", "")
     metadata = {
@@ -46,24 +61,31 @@ def _store_completed_result(tasks_table, task_id: str, result: dict, schema: dic
         "processed_at": updated_at,
         "quality": build_quality_metadata(schema, result),
     }
+    update_expr = (
+        "SET #status = :status, updated_at = :updated_at, "
+        "#result = :result, #meta = :meta"
+    )
+    expr_values = {
+        ":status": "completed",
+        ":updated_at": updated_at,
+        ":result": result,
+        ":meta": metadata,
+    }
+    if file_lifecycle_state is not None:
+        update_expr += ", file_lifecycle_state = :file_state"
+        expr_values[":file_state"] = file_lifecycle_state
+    update_expr += " REMOVE #err"
+
     tasks_table.update_item(
         Key={"task_id": task_id},
-        UpdateExpression=(
-            "SET #status = :status, updated_at = :updated_at, "
-            "#result = :result, #meta = :meta REMOVE #err"
-        ),
+        UpdateExpression=update_expr,
         ExpressionAttributeNames={
             "#status": "status",
             "#result": "result",
             "#meta": "result_metadata",
             "#err": "error_message",
         },
-        ExpressionAttributeValues={
-            ":status": "completed",
-            ":updated_at": updated_at,
-            ":result": result,
-            ":meta": metadata,
-        },
+        ExpressionAttributeValues=expr_values,
     )
 
 
@@ -83,14 +105,23 @@ def process_record(tasks_table, payload: dict) -> None:
     update_task_status(tasks_table, task_id, "running")
 
     input_spec, schema = validate_extract_payload(payload)
-    if input_spec["mode"] == "text":
+    file_mode = input_spec["mode"] == "file"
+    if not file_mode:
         text = input_spec["text"]
     else:
         file_ref = input_spec["file"]
-        text = load_s3_text_object(file_ref["bucket"], file_ref["key"])
+        _set_file_lifecycle_state(tasks_table, task_id, "ingested")
+        _set_file_lifecycle_state(tasks_table, task_id, "processing")
+        text = preprocess_file_to_text(file_ref["bucket"], file_ref["key"])
 
     result = invoke_bedrock_extract(text, schema)
-    _store_completed_result(tasks_table, task_id, result, schema)
+    _store_completed_result(
+        tasks_table,
+        task_id,
+        result,
+        schema,
+        file_lifecycle_state="extracted" if file_mode else None,
+    )
 
     logger.info(
         "Task processing completed",
@@ -176,6 +207,8 @@ def handler(event, context):
                 "failed",
                 error_message=err_text,
             )
+            if (payload.get("input") or {}).get("mode") == "file":
+                _set_file_lifecycle_state(tasks_table, task_id, "failed")
             logger.info(
                 "Marked task as failed",
                 extra=_worker_extra(
