@@ -201,4 +201,5 @@ These are candidate capabilities to grow from extraction MVP to a more complete 
 - [ADR 0001: Async task pattern](adrs/0001-async-task-pattern.md)
 - [ADR 0002: DLQ manual operation](adrs/0002-dlq-manual-operation.md)
 - [ADR 0003: Auth and tenancy](adrs/0003-auth-and-tenancy.md)
+- [ADR 0004: Orchestration boundary](adrs/0004-orchestration-boundary.md)
 - [DLQ and alerts runbook](runbooks/dlq-and-alerts.md)
