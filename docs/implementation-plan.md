@@ -33,6 +33,7 @@ Recent completion notes:
 - Live validation confirmed PDF path behavior: deterministic failure for invalid/synthetic PDF and successful extraction for real PDF/image-heavy sample through Textract preprocessing.
 - File-type routing now supports S3 metadata fallback (`HeadObject` `ContentType`) when key extension is missing/unknown, and Textract exception mapping is explicit for deterministic operator triage.
 - Lifecycle contract boundary is now documented: API consumers should rely on top-level `status`, while `file_lifecycle_state` is internal/operator-facing telemetry.
+- Orchestration decision is documented: remain worker-only for current Phase 3 scope, with explicit trigger conditions for Step Functions migration.
 
 ---
 

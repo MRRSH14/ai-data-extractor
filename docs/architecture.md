@@ -163,6 +163,24 @@ Practical sequence for this product:
 2. **Next (file mode):** add document ingestion and Textract where OCR/layout is needed.
 3. **Later (complex pipelines):** introduce Step Functions once multiple dependent stages justify orchestration overhead.
 
+## Orchestration decision (current)
+
+Current decision: keep worker-only orchestration (`SQS -> worker`) for now, with Textract handled inline in worker processing.
+
+Rationale:
+- current file pipeline remains short-running and operationally manageable in a single worker path;
+- top-level `/tasks` contract remains stable while internals evolve;
+- this minimizes architecture overhead while Phase 3 behavior is still being validated.
+
+Trigger conditions to move to Step Functions:
+- async Textract job flow is required (start job + wait/poll/callback);
+- workflow adds multiple dependent branching stages or human review loops;
+- per-step retry/timeout policies and execution-history visibility become operational requirements.
+
+Migration boundary:
+- keep API contract and task retrieval shape stable (`POST /tasks`, `GET /tasks/{id}`);
+- move internal orchestration only, preserving status semantics for callers.
+
 ## Advanced feature evolution (post-MVP)
 
 These are candidate capabilities to grow from extraction MVP to a more complete platform.
