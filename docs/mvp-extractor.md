@@ -195,6 +195,12 @@ queued → running → completed
 `result_metadata` is only present when `status == "completed"`.
 `error_message` is present when `status == "failed"` or `"retrying"`.
 
+### Contract boundary: status vs file lifecycle marker
+
+- `status` is the stable, user-visible task contract (`queued`, `running`, `completed`, `failed`, `retrying`).
+- `file_lifecycle_state` is an internal/operator-facing diagnostic marker for file-mode processing stages (`ingested`, `processing`, `extracted`, `failed`).
+- Clients should rely on top-level `status` for workflow control and treat `file_lifecycle_state` as auxiliary telemetry that may evolve with pipeline internals.
+
 ### Quality metadata (task-level, optional)
 
 When extraction completes, `result_metadata.quality` provides operator-facing quality signals:

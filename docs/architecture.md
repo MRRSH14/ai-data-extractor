@@ -128,6 +128,8 @@ For file-mode tasks, the worker also records a `file_lifecycle_state` marker on 
 | `extracted` | Extraction finished successfully for file-mode task |
 | `failed` | File-mode processing hit a deterministic non-retryable failure |
 
+This marker is intended for operator visibility and troubleshooting. The stable client-facing lifecycle remains the top-level `status` field.
+
 ## Current intentional limitations
 
 - **Tenant migration caveat:** Older task rows created before tenant-aware writes may not have `tenant_id`; those records may be inaccessible under strict tenant checks until migrated.
