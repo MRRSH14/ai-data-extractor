@@ -1,0 +1,32 @@
+{
+  "task_id": "task-6acc3376",
+  "status": "completed",
+  "job_type": "extract",
+  "result": {
+    "invoice_id": "INV-2024-001",
+    "amount": 1250,
+    "is_paid": true
+  },
+  "result_metadata": {
+    "provider": "bedrock",
+    "model_id": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "processed_at": "2026-05-08T13:39:00Z",
+    "quality": {
+      "coverage": {
+        "schema_fields_total": 3,
+        "schema_fields_extracted": 3,
+        "ratio": 1
+      },
+      "required_coverage": {
+        "required_fields_total": 3,
+        "required_fields_extracted": 3,
+        "ratio": 1
+      },
+      "field_presence": {
+        "invoice_id": true,
+        "amount": true,
+        "is_paid": true
+      }
+    }
+  }
+}

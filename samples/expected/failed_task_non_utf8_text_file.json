@@ -1,0 +1,7 @@
+{
+  "task_id": "task-example-non-utf8",
+  "status": "failed",
+  "job_type": "extract",
+  "error_message": "[INPUT_CONTRACT] s3 object content must be UTF-8 text",
+  "file_lifecycle_state": "failed"
+}

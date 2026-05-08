@@ -1,0 +1,22 @@
+{
+  "job_type": "extract",
+  "input": {
+    "mode": "text",
+    "text": "Invoice #INV-2024-001 dated 2024-03-15. Total due: $1250.00. Vendor: Acme Corp. Paid: yes.",
+    "schema": {
+      "invoice_id": {
+        "type": "string",
+        "required": true
+      },
+      "amount": {
+        "type": "number",
+        "required": true,
+        "minimum": 0
+      },
+      "is_paid": {
+        "type": "boolean",
+        "required": true
+      }
+    }
+  }
+}

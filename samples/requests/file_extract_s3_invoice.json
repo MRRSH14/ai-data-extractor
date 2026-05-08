@@ -1,0 +1,25 @@
+{
+  "job_type": "extract",
+  "input": {
+    "mode": "file",
+    "file": {
+      "source": "s3",
+      "bucket": "REPLACE_WITH_INPUT_BUCKET",
+      "key": "smoke/valid-sample.txt"
+    },
+    "schema": {
+      "invoice_id": {
+        "type": "string",
+        "required": true
+      },
+      "amount": {
+        "type": "number",
+        "required": true
+      },
+      "is_paid": {
+        "type": "boolean",
+        "required": true
+      }
+    }
+  }
+}

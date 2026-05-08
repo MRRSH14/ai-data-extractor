@@ -1,0 +1,7 @@
+{
+  "task_id": "task-example-missing-key",
+  "status": "failed",
+  "job_type": "extract",
+  "error_message": "[INPUT_CONTRACT] s3 object not found: \"REPLACE_WITH_INPUT_BUCKET/smoke/does-not-exist.txt\"",
+  "file_lifecycle_state": "failed"
+}

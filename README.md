@@ -8,13 +8,26 @@ A **schema-driven async data extraction service** on AWS, bootstrapped from `pla
 - **Asynchronous execution** via a **tasks queue** and a **worker Lambda** that updates task state in **DynamoDB**.
 - **Infrastructure as code** with **AWS CDK** (Python) and a manual GitHub Actions deploy workflow.
 
-See **[docs/architecture.md](docs/architecture.md)** for baseline diagrams and request flow. Product-specific extraction behavior is tracked in the implementation plan and will be added incrementally.
+See **[docs/architecture.md](docs/architecture.md)** for diagrams and current request flow, and **[docs/mvp-extractor.md](docs/mvp-extractor.md)** for extraction contracts and failure semantics.
 
-## Product direction (next)
+## Start here (documentation flow)
 
-The next product milestone is **extractor MVP (text-first) into structured JSON**:
+For fastest onboarding, read in this order:
 
-- User submits `job_type="extract"` with inline text (`input.mode="text"`) plus desired result schema.
+1. **README** (this file) - setup, endpoints, smoke flow, and project status.
+2. **[Architecture](docs/architecture.md)** - system components, async flow, task lifecycle.
+3. **[DLQ runbook](docs/runbooks/dlq-and-alerts.md)** - operator procedures and failure triage.
+4. **ADRs** - why key decisions were made:
+   - [ADR 0001](docs/adrs/0001-async-task-pattern.md)
+   - [ADR 0002](docs/adrs/0002-dlq-manual-operation.md)
+   - [ADR 0003](docs/adrs/0003-auth-and-tenancy.md)
+   - [ADR 0004](docs/adrs/0004-orchestration-boundary.md)
+
+## Product direction (current)
+
+The current product milestone is **extractor MVP into structured JSON**:
+
+- User submits `job_type="extract"` with `input.mode="text"` or `input.mode="file"` plus desired result schema.
 - Worker performs extraction and validates output shape.
 - Task status and result are retrievable through the existing async task pattern.
 - Deterministic malformed payload/output paths are treated as terminal `failed`; transient failures continue through retry/DLQ.
@@ -45,7 +58,7 @@ Rationale is recorded in [ADR 0001](docs/adrs/0001-async-task-pattern.md). DLQ h
 |--------|------|---------|
 | `GET` | `/health` | Liveness-style check (`{"ok": true}`). **Public** |
 | `GET` | `/hello` | Sample query param `name` (demo / smoke). **Public** |
-| `POST` | `/tasks` | Create an extraction task. MVP contract: `job_type="extract"` and text-mode input (`input.mode="text"`, `input.text`, `input.schema`). Returns **202** with task metadata; repeated logical requests by the same user/tenant return the existing task via server-side idempotency. **JWT required** |
+| `POST` | `/tasks` | Create an extraction task. MVP contract: `job_type="extract"` with `input.mode="text"` or `input.mode="file"` (S3 reference) plus `input.schema`. Returns **202** with task metadata; repeated logical requests by the same user/tenant return the existing task via server-side idempotency. **JWT required** |
 | `GET` | `/tasks/{id}` | Return the task item from DynamoDB or **404**. **JWT required** |
 
 **Security note:** API Gateway now uses a Cognito User Pool JWT authorizer for task routes, and task handlers enforce tenant ownership using JWT claims. `/health` and `/hello` remain public.
@@ -65,6 +78,29 @@ export BEDROCK_MODEL_ID="anthropic.claude-3-haiku-20240307-v1:0"  # optional now
 export BEDROCK_REGION="us-east-1"                   # optional; defaults to stack region
 cdk deploy
 ```
+
+## Quickstart (from scratch)
+
+This path is the recommended "new machine to validated service" sequence.
+
+```bash
+# 1) deploy infra
+cd infra
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+export BEDROCK_MODEL_ID="global.anthropic.claude-haiku-4-5-20251001-v1:0"
+export BEDROCK_REGION="us-east-1"
+cdk deploy --require-approval never --profile mrrsh
+
+# 2) back to repo root: create dev users/tokens + baseline checks
+cd ..
+AWS_PROFILE=mrrsh ./scripts/dev_setup.sh
+
+# 3) run unified smoke (text + file scenarios)
+AWS_PROFILE=mrrsh ./scripts/dev_smoke_all.sh --skip-login
+```
+
+Latest validation run: 2026-05-08 (local deploy + full smoke pass for text mode and file mode).
 
 Worker IAM scopes `bedrock:InvokeModel` to resource ARNs derived from `BEDROCK_MODEL_ID` (foundation model ID, inference profile ID, or full ARN). The policy includes Bedrock compatibility variants needed for inference-profile-backed invokes.
 
@@ -164,6 +200,8 @@ Smoke checks now validate:
 - `result_metadata` presence on completed tasks (`provider`, `model_id`, `processed_at`)
 - `result_metadata.quality` metrics on completed tasks (`coverage`, `required_coverage`, `field_presence`)
 
+Quick evaluation payloads and expected terminal responses are provided in [`samples/`](samples/README.md).
+
 ### Tenant onboarding acceptance check
 
 Use this quick check after onboarding a user to confirm tenant isolation still works:
@@ -195,16 +233,18 @@ For each schema field descriptor:
 | Phase | Focus |
 |-------|--------|
 | **Current** | Platform baseline from `platform-v1`: async API + worker, auth/tenancy, observability, idempotency, and operational docs. |
-| **Next** | Extractor MVP: schema-driven extraction contract, worker extraction flow, result persistence/retrieval, and validation/error semantics. |
+| **Next** | Phase 4 reliability: throughput tuning, retry policy refinement, idempotency/TTL review, and safer DLQ redrive tooling. |
 | **Later** | Advanced extraction features (larger files, richer formats, quality controls, cost/performance tuning, optional UI/workflow integrations). |
 
 ## Documentation index
 
 - [Architecture](docs/architecture.md)
+- [DLQ runbook](docs/runbooks/dlq-and-alerts.md)
 - [MVP extractor contract](docs/mvp-extractor.md)
 - [Observability](docs/observability.md)
 - [Implementation plan (living roadmap & checklist)](docs/implementation-plan.md)
 - [ADR 0001 — Async task pattern](docs/adrs/0001-async-task-pattern.md)
 - [ADR 0002 — DLQ manual operation](docs/adrs/0002-dlq-manual-operation.md)
 - [ADR 0003 — Auth and tenancy](docs/adrs/0003-auth-and-tenancy.md)
-- [DLQ runbook](docs/runbooks/dlq-and-alerts.md)
+- [ADR 0004 — Orchestration boundary](docs/adrs/0004-orchestration-boundary.md)
+- [Release checklist (5-day ship plan)](docs/release-checklist.md)
