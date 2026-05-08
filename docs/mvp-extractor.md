@@ -15,6 +15,7 @@ Current execution status:
 - `mode="file"` supports S3 inputs and routes by key extension:
   - text-like files (`.txt`, `.md`, `.csv`, `.json`) use UTF-8 object decoding,
   - document/image files (`.pdf`, `.png`, `.jpg`, `.jpeg`, `.tiff`, `.tif`) use Textract text detection before extraction.
+- If extension is missing/unknown, worker falls back to S3 object metadata (`ContentType`) from `HeadObject` for routing.
 - File-mode lifecycle state is tracked in `file_lifecycle_state` (`ingested`, `processing`, `extracted`, `failed`).
 
 Latest smoke evidence (2026-05-06):

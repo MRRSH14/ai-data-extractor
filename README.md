@@ -150,6 +150,13 @@ You can also run file-mode smoke directly when env vars are already set:
 API_URL="..." TEST_ID_TOKEN="..." INPUT_BUCKET="..." ./scripts/dev_test_file_mode.sh
 ```
 
+Optional: provide a specific local PDF file for an additional repeatable extraction case:
+
+```bash
+API_URL="..." TEST_ID_TOKEN="..." INPUT_BUCKET="..." \
+./scripts/dev_test_file_mode.sh --pdf-path "/absolute/path/to/sample.pdf"
+```
+
 Smoke checks now validate:
 
 - extractor scenario #1 (`invoice_id`, `amount`, `is_paid`)

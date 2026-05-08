@@ -14,6 +14,30 @@ def s3_client():
     return boto3.client("s3")
 
 
+def get_s3_object_content_type(bucket: str, key: str) -> str | None:
+    try:
+        response = s3_client().head_object(Bucket=bucket, Key=key)
+    except ClientError as exc:
+        error = exc.response.get("Error", {})
+        code = error.get("Code", "")
+        if code in {"NoSuchBucket", "NoSuchKey", "404"}:
+            raise non_retryable(
+                ErrorCode.INPUT_CONTRACT,
+                f's3 object not found: "{bucket}/{key}"',
+            ) from None
+        if code == "AccessDenied":
+            raise non_retryable(
+                ErrorCode.INPUT_CONTRACT,
+                f's3 access denied for "{bucket}/{key}"',
+            ) from None
+        raise
+
+    value = response.get("ContentType")
+    if isinstance(value, str) and value.strip():
+        return value.strip().lower()
+    return None
+
+
 def load_s3_object_bytes(bucket: str, key: str) -> bytes:
     try:
         response = s3_client().get_object(Bucket=bucket, Key=key)

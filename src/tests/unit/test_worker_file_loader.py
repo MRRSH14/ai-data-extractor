@@ -10,13 +10,23 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "test")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
 
 from worker.errors import NonRetryableProcessingError
-from worker.file_loader import load_s3_object_bytes, load_s3_text_object
+from worker.file_loader import (
+    get_s3_object_content_type,
+    load_s3_object_bytes,
+    load_s3_text_object,
+)
 
 
 class _FakeS3Client:
-    def __init__(self, payload: bytes | None = None, error_code: str | None = None):
+    def __init__(
+        self,
+        payload: bytes | None = None,
+        error_code: str | None = None,
+        content_type: str | None = None,
+    ):
         self.payload = payload
         self.error_code = error_code
+        self.content_type = content_type
 
     def get_object(self, *, Bucket: str, Key: str) -> dict:
         if self.error_code:
@@ -30,6 +40,21 @@ class _FakeS3Client:
                 "GetObject",
             )
         return {"Body": io.BytesIO(self.payload or b"")}
+
+    def head_object(self, *, Bucket: str, Key: str) -> dict:
+        if self.error_code:
+            raise ClientError(
+                {
+                    "Error": {
+                        "Code": self.error_code,
+                        "Message": f"simulated {self.error_code}",
+                    }
+                },
+                "HeadObject",
+            )
+        if self.content_type is None:
+            return {}
+        return {"ContentType": self.content_type}
 
 
 def test_load_s3_text_object_reads_utf8(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -65,3 +90,11 @@ def test_load_s3_object_bytes_returns_raw_bytes(monkeypatch: pytest.MonkeyPatch)
         lambda: _FakeS3Client(payload=b"abc123"),
     )
     assert load_s3_object_bytes("bucket-a", "path/file.bin") == b"abc123"
+
+
+def test_get_s3_object_content_type_reads_head_object(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "worker.file_loader.s3_client",
+        lambda: _FakeS3Client(content_type="application/pdf"),
+    )
+    assert get_s3_object_content_type("bucket-a", "path/file.pdf") == "application/pdf"

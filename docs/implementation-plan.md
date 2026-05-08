@@ -31,6 +31,7 @@ Recent completion notes:
 - Added repeatable smoke tooling for extractor validation: `scripts/dev_test_file_mode.sh` (file-mode scenarios) and `scripts/dev_smoke_all.sh` (single entrypoint for auth + text/file smoke checks).
 - Worker file-mode routing now branches by extension (text decode vs Textract preprocessing), and writes explicit `file_lifecycle_state` markers (`ingested`, `processing`, `extracted`, `failed`) for file task visibility.
 - Live validation confirmed PDF path behavior: deterministic failure for invalid/synthetic PDF and successful extraction for real PDF/image-heavy sample through Textract preprocessing.
+- File-type routing now supports S3 metadata fallback (`HeadObject` `ContentType`) when key extension is missing/unknown, and Textract exception mapping is explicit for deterministic operator triage.
 
 ---
 

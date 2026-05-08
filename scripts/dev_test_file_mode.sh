@@ -6,6 +6,12 @@ set -euo pipefail
 #   TEST_ID_TOKEN
 #   INPUT_BUCKET
 #
+# Optional:
+#   INPUT_PDF_PATH (local file path for a caller-provided PDF sample)
+#
+# Flags:
+#   --pdf-path <local-file-path>  Override INPUT_PDF_PATH for this run.
+#
 # Example setup:
 #   export API_URL="https://....execute-api.us-east-1.amazonaws.com"
 #   export TEST_ID_TOKEN="eyJ..."
@@ -30,6 +36,24 @@ if ! command -v aws >/dev/null 2>&1; then
   echo "Missing aws CLI"
   exit 1
 fi
+
+PDF_PATH_OVERRIDE=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --pdf-path)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --pdf-path"
+        exit 1
+      fi
+      PDF_PATH_OVERRIDE="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown argument: $1"
+      exit 1
+      ;;
+  esac
+done
 
 create_task() {
   local key="$1"
@@ -106,6 +130,7 @@ unix_ts="$(date +%s)"
 valid_key="smoke/valid-${unix_ts}.txt"
 non_utf8_key="smoke/nonutf-${unix_ts}.bin"
 missing_key="smoke/does-not-exist-${unix_ts}.txt"
+pdf_key="smoke/user-pdf-${unix_ts}.pdf"
 
 printf 'Invoice INV-100 amount 42.5 paid yes' > /tmp/file-mode-valid.txt
 python3 - <<'PY'
@@ -148,5 +173,23 @@ PY
 )"
 nonutf_terminal_resp="$(poll_terminal "$nonutf_task_id")"
 summarize_case "non_utf8" "$nonutf_terminal_resp"
+
+pdf_path="${PDF_PATH_OVERRIDE:-${INPUT_PDF_PATH:-}}"
+if [[ -n "$pdf_path" ]]; then
+  if [[ ! -f "$pdf_path" ]]; then
+    echo "[FAIL] Provided PDF path does not exist: $pdf_path"
+    exit 1
+  fi
+  aws s3 cp "$pdf_path" "s3://$INPUT_BUCKET/$pdf_key" >/dev/null
+  pdf_create_resp="$(create_task "$pdf_key")"
+  pdf_task_id="$(
+    python3 - <<'PY' "$pdf_create_resp"
+import json,sys
+print(json.loads(sys.argv[1]).get("task_id",""))
+PY
+  )"
+  pdf_terminal_resp="$(poll_terminal "$pdf_task_id")"
+  summarize_case "provided_pdf" "$pdf_terminal_resp"
+fi
 
 echo "File-mode smoke checks complete."
