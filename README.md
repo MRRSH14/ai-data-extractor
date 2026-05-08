@@ -239,6 +239,8 @@ For each schema field descriptor:
 ## Documentation index
 
 - [Architecture](docs/architecture.md)
+- [Design decisions (showcase summary)](docs/design-decisions.md)
+- [Demo script (3-5 minutes)](docs/demo-script.md)
 - [DLQ runbook](docs/runbooks/dlq-and-alerts.md)
 - [MVP extractor contract](docs/mvp-extractor.md)
 - [Observability](docs/observability.md)
@@ -248,3 +250,4 @@ For each schema field descriptor:
 - [ADR 0003 — Auth and tenancy](docs/adrs/0003-auth-and-tenancy.md)
 - [ADR 0004 — Orchestration boundary](docs/adrs/0004-orchestration-boundary.md)
 - [Release checklist (5-day ship plan)](docs/release-checklist.md)
+- [Changelog](CHANGELOG.md)

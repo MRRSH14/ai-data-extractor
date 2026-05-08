@@ -10,46 +10,46 @@ Use this checklist to move from current MVP to a public, showcase-ready open-sou
 
 ## Day 1 - Stability gate
 
-- [ ] Run full unit tests (`PYTHONPATH=src infra/.venv/bin/python -m pytest src/tests/unit -q`).
-- [ ] Run lint/diagnostics pass and fix regressions.
-- [ ] Validate no unintended local changes (`git status` clean after fixes/commits).
+- [x] Run full unit tests (`PYTHONPATH=src infra/.venv/bin/python -m pytest src/tests/unit -q`).
+- [x] Run lint/diagnostics pass and fix regressions.
+- [x] Validate no unintended local changes (`git status` clean after fixes/commits).
 - [ ] Record final "known limitations" list for release notes.
 
 ## Day 2 - Deploy and smoke validation
 
-- [ ] Deploy stack from clean env (`cdk deploy`) with required Bedrock/Textract env vars.
-- [ ] Run unified smoke script (`scripts/dev_smoke_all.sh`) for text and file modes.
-- [ ] Manually verify three file scenarios:
+- [x] Deploy stack from clean env (`cdk deploy`) with required Bedrock/Textract env vars.
+- [x] Run unified smoke script (`scripts/dev_smoke_all.sh`) for text and file modes.
+- [x] Manually verify three file scenarios:
   - valid S3 UTF-8 object -> `completed`;
   - missing key -> `failed` with deterministic input-contract style message;
   - non-UTF8 object -> deterministic non-retryable failure (no retry loop).
-- [ ] Capture 2-3 evidence artifacts (task payloads, status snapshots, logs) for docs/post.
+- [x] Capture 2-3 evidence artifacts (task payloads, status snapshots, logs) for docs/post.
 
 ## Day 3 - Open-source polish
 
-- [ ] Confirm `README.md` quickstart is complete and works end-to-end.
-- [ ] Ensure core docs are coherent and linked:
+- [x] Confirm `README.md` quickstart is complete and works end-to-end.
+- [x] Ensure core docs are coherent and linked:
   - `docs/architecture.md`
   - `docs/mvp-extractor.md`
   - `docs/implementation-plan.md`
   - `docs/runbooks/dlq-and-alerts.md`
   - `docs/adrs/*`
-- [ ] Add/verify repository essentials:
+- [x] Add/verify repository essentials:
   - `LICENSE`
   - contribution guide (`CONTRIBUTING.md`)
   - issue template(s) and PR template (optional but recommended)
-- [ ] Add a short "Project status / roadmap" block in README (what is done now vs next).
+- [x] Add a short "Project status / roadmap" block in README (what is done now vs next).
 
 ## Day 4 - Showcase package
 
-- [ ] Finalize one architecture diagram for the repository and LinkedIn visuals.
-- [ ] Create `docs/design-decisions.md` (or equivalent) with key tradeoffs:
+- [x] Finalize one architecture diagram for the repository and LinkedIn visuals.
+- [x] Create `docs/design-decisions.md` (or equivalent) with key tradeoffs:
   - async API + worker pattern;
   - deterministic error taxonomy;
   - file-mode preprocessing + Textract path;
   - Step Functions deferred decision and migration triggers.
-- [ ] Prepare one demo script narrative (3-5 minutes) with expected outputs.
-- [ ] Draft release notes (`CHANGELOG.md` entry or GitHub release notes draft).
+- [x] Prepare one demo script narrative (3-5 minutes) with expected outputs.
+- [x] Draft release notes (`CHANGELOG.md` entry or GitHub release notes draft).
 
 ## Day 5 - Publish
 
