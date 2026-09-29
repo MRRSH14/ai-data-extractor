@@ -13,7 +13,7 @@ Use this checklist to move from current MVP to a public, showcase-ready open-sou
 - [x] Run full unit tests (`PYTHONPATH=src infra/.venv/bin/python -m pytest src/tests/unit -q`).
 - [x] Run lint/diagnostics pass and fix regressions.
 - [x] Validate no unintended local changes (`git status` clean after fixes/commits).
-- [ ] Record final "known limitations" list for release notes.
+- [x] Record final "known limitations" list for release notes.
 
 ## Day 2 - Deploy and smoke validation
 
@@ -53,9 +53,9 @@ Use this checklist to move from current MVP to a public, showcase-ready open-sou
 
 ## Day 5 - Publish
 
-- [ ] Final pass: tests + lint + smoke (quick confidence rerun).
-- [ ] Tag release (`v0.1.0`) and publish GitHub release notes.
-- [ ] Confirm repository visibility/settings and pinned README sections.
+- [x] Final pass: tests + lint + smoke (quick confidence rerun).
+- [x] Tag release (`v0.1.0`) and publish GitHub release notes.
+- [x] Confirm repository is public (verified 2026-09-29). Remaining in GitHub UI: topics, homepage, optional profile pin (see README “GitHub listing”).
 - [ ] Publish LinkedIn post with:
   - problem statement;
   - architecture snapshot;
@@ -65,8 +65,8 @@ Use this checklist to move from current MVP to a public, showcase-ready open-sou
 
 ## Exit criteria (ready to post)
 
-- [ ] New contributor can run the project from README without private context.
-- [ ] All core tests pass and smoke flow is repeatable.
-- [ ] Documentation reflects actual behavior (no stale contracts).
-- [ ] Demo evidence exists for both success and deterministic failure paths.
-- [ ] Public narrative is honest about scope, tradeoffs, and next steps.
+- [x] New contributor can run the project from README without private context.
+- [x] All core tests pass and smoke flow is repeatable.
+- [x] Documentation reflects actual behavior (no stale contracts).
+- [x] Demo evidence exists for both success and deterministic failure paths.
+- [x] Public narrative is honest about scope, tradeoffs, and next steps.

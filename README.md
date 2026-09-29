@@ -1,6 +1,9 @@
 # ai-data-extractor
 
-A **schema-driven async data extraction service** on AWS, bootstrapped from `platform-v1` of `aws-ai-platform-service`. The repository currently keeps the proven platform baseline (API Gateway HTTP API, Lambda, SQS, DynamoDB, DLQ, auth/tenancy, observability, idempotency) and is now focused on implementing the first extraction product workflow.
+[![Release](https://img.shields.io/github/v/release/MRRSH14/ai-data-extractor?display_name=tag)](https://github.com/MRRSH14/ai-data-extractor/releases/tag/v0.1.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+A **schema-driven async data extraction service** on AWS, bootstrapped from `platform-v1` of `aws-ai-platform-service`. **`v0.1.0` is the extractor MVP** (text + file modes, tenant-aware JWT, retries/DLQ). Later work is Phase 4 reliability and Phase 5 multi-tenant product features — see the [changelog](CHANGELOG.md) and [implementation plan](docs/implementation-plan.md).
 
 ## What this project is
 
@@ -232,9 +235,18 @@ For each schema field descriptor:
 
 | Phase | Focus |
 |-------|--------|
-| **Current** | Platform baseline from `platform-v1`: async API + worker, auth/tenancy, observability, idempotency, and operational docs. |
+| **Current (`v0.1.0`)** | Extractor MVP on the platform baseline: async API + worker, auth/tenancy, observability, idempotency, text and file input, Textract preprocessing. |
 | **Next** | Phase 4 reliability: throughput tuning, retry policy refinement, idempotency/TTL review, and safer DLQ redrive tooling. |
 | **Later** | Advanced extraction features (larger files, richer formats, quality controls, cost/performance tuning, optional UI/workflow integrations). |
+
+## GitHub listing
+
+The repository is **public**. In GitHub: **Settings → General → “About”** (or the gear on the repo header), then:
+
+- **Description:** `Schema-driven async extraction API on AWS (API Gateway, Lambda, SQS, DynamoDB, Bedrock, Textract)`
+- **Website:** `https://github.com/MRRSH14/ai-data-extractor/releases/tag/v0.1.0`
+- **Topics:** `aws` `serverless` `lambda` `api-gateway` `sqs` `dynamodb` `cdk` `python` `bedrock` `textract` `llm`
+- **Pin (optional):** GitHub profile → Customize pins → select `ai-data-extractor`
 
 ## Documentation index
 

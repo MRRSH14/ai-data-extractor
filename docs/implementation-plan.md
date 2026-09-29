@@ -42,9 +42,9 @@ Recent completion notes:
 ### Phase 3 — Input expansion
 
 - [x] Add file input mode (S3/object reference) in addition to text mode.
-- [ ] Introduce document preprocessing (PDF/text normalization) before extraction.
-- [ ] Add async file lifecycle states and validations for file-mode tasks.
-- [ ] Keep the same `/tasks` contract with mode-based processing.
+- [x] Introduce document preprocessing (PDF/text normalization) before extraction.
+- [x] Add async file lifecycle states and validations for file-mode tasks.
+- [x] Keep the same `/tasks` contract with mode-based processing.
 
 Step Functions adoption guideline (for Phase 3+):
 
@@ -59,8 +59,8 @@ Step Functions adoption guideline (for Phase 3+):
 Current sequence:
 
 1. Implement S3 file mode with UTF-8 text objects in worker (same extraction path as text mode). ✅ Completed and smoke-validated.
-2. Add document preprocessing path (PDF/image) using Textract.
-3. Add file lifecycle states and then evaluate Step Functions orchestration once branching + async stages are active.
+2. Add document preprocessing path (PDF/image) using Textract. ✅ Completed (sync DetectDocumentText; async jobs deferred).
+3. Add file lifecycle states and then evaluate Step Functions orchestration once branching + async stages are active. ✅ Lifecycle markers shipped; Step Functions remains deferred per ADR 0004.
 
 ### Phase 4 — Scale and reliability
 
